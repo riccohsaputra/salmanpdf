@@ -1,4 +1,4 @@
-# 🍊 Tangerine Linux — Prototipe v0.3.1 (drop-zone + mode global Shift+Drag)
+# 🍊 Tangerine Linux — Prototipe v0.3.2 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.

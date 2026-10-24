@@ -24,7 +24,7 @@ ORANGE_LIGHT = QColor("#ffa04d")
 DARK = QColor(255, 255, 255, 235)      # tengah wheel: putih kaca
 SECTOR = QColor(255, 255, 255, 215)    # sektor: putih transparan
 SECTOR_HOVER = QColor("#ff7a1a")
-SECTOR_EDGE = QColor(0, 0, 0, 35)
+SECTOR_EDGE = QColor(0, 0, 0, 70)
 TEXT = QColor("#26221f")
 TEXT_HOVER = QColor("#ffffff")
 

@@ -21,9 +21,9 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, Qt, Signal
-from PySide6.QtGui import QColor, QCursor, QFont, QPainter, QPainterPath
+from PySide6.QtGui import QColor, QCursor, QFont, QGuiApplication, QPainter, QPainterPath
 from PySide6.QtCore import QRectF
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QGraphicsDropShadowEffect, QWidget
 
 from .converters import detect_kind, formats_for
 
@@ -32,7 +32,7 @@ SIZE = 340
 # hover oranye + teks putih.
 SECTOR = QColor(255, 255, 255, 215)
 SECTOR_HOVER = QColor("#ff7a1a")
-SECTOR_EDGE = QColor(0, 0, 0, 35)
+SECTOR_EDGE = QColor(0, 0, 0, 70)
 CENTER = QColor(255, 255, 255, 235)
 TEXT = QColor("#26221f")
 TEXT_HOVER = QColor("#ffffff")
@@ -66,6 +66,14 @@ class WheelOverlay(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFixedSize(SIZE, SIZE)
         self.setAcceptDrops(True)
+        # Bayangan lembut mengikuti siluet lingkaran wheel — bikin tepi
+        # lingkaran tegas terlihat (tidak "hilang" di atas jendela putih)
+        # dan lingkarannya terbaca simetris.
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(28)
+        shadow.setOffset(0, 6)
+        shadow.setColor(QColor(0, 0, 0, 110))
+        self.setGraphicsEffect(shadow)
         self._formats: list[str] = []
         self._files: list[Path] = []
         self._hover = -1
@@ -74,7 +82,17 @@ class WheelOverlay(QWidget):
     # ------------------------------------------------------------ show
     def show_at_cursor(self) -> None:
         pos = QCursor.pos()
-        self.move(pos.x() - SIZE // 2, pos.y() - SIZE // 2)
+        # PENTING: clamp supaya SELURUH lingkaran selalu di dalam layar.
+        # Dulu wheel ditengahin persis di kursor — kalau drag-nya dekat
+        # tepi/atas layar, separuh lingkaran keluar layar dan wheel
+        # kelihatan "tidak simetris" / terpotong.
+        screen = QGuiApplication.screenAt(pos) or QGuiApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        x = pos.x() - SIZE // 2
+        y = pos.y() - SIZE // 2
+        x = max(geo.left() + 4, min(x, geo.right() - SIZE - 4))
+        y = max(geo.top() + 4, min(y, geo.bottom() - SIZE - 4))
+        self.move(x, y)
         self._formats, self._files, self._hover = [], [], -1
         self._label = "🍊 drop di wheel…"
         self.show()
