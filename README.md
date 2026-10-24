@@ -75,8 +75,13 @@ Install cara clone (sekali saja):
 
 ```bash
 git clone https://github.com/riccohsaputra/tangerine-linux.git
-cd tangerine-linux && ./run.sh
+cd tangerine-linux
+chmod +x run.sh update.sh build-deb.sh   # wajib sekali: file dari GitHub kehilangan bit executable
+./run.sh
 ```
+
+> Kalau `./run.sh` kena "Permission denied", jalankan `chmod +x` di atas,
+> atau pakai `bash run.sh` (cara ini tidak butuh bit executable sama sekali).
 
 Update setelah itu cukup satu perintah dari folder clone:
 
