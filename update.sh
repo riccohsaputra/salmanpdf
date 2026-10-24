@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Tangerine Linux — update dari GitHub (pola yang sama kayak kyai-update).
+# Jalan dari dalam folder clone repo ini:
+#   ./update.sh
+# Yang dilakukan: git pull --ff-only, lalu dependency di-sync otomatis
+# oleh run.sh pada jalan berikutnya (stamp hash requirements.txt).
+set -e
+cd "$(dirname "$0")"
+
+if [ ! -d .git ]; then
+  echo "❌ Folder ini bukan clone git. Update via GitHub hanya untuk"
+  echo "   install cara clone:"
+  echo "   git clone https://github.com/riccohsaputra/tangerine-linux.git"
+  exit 1
+fi
+
+OLD=$(python3 -c "import re;print(re.search(r'__version__ = \"(.+)\"', open('tangerine/__init__.py').read()).group(1))" 2>/dev/null || echo "?")
+echo "🍊 Versi sekarang: $OLD — menarik update…"
+git pull --ff-only
+NEW=$(python3 -c "import re;print(re.search(r'__version__ = \"(.+)\"', open('tangerine/__init__.py').read()).group(1))" 2>/dev/null || echo "?")
+
+if [ "$OLD" = "$NEW" ]; then
+  echo "✅ Sudah versi terbaru ($NEW), tidak ada perubahan."
+else
+  echo "✅ Update beres: $OLD → $NEW"
+fi
+echo "   Dependency akan di-sync otomatis saat ./run.sh berikutnya."

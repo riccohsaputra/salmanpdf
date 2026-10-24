@@ -1,0 +1,14 @@
+#!/bin/sh
+# Jalan saat install DAN saat upgrade .deb.
+# venv dipakai ulang; dependency SELALU di-sync ulang dari requirements.txt
+# supaya update yang menambah library baru langsung beres.
+set -e
+APP=/opt/tangerine-linux
+if [ ! -x "$APP/.venv/bin/python" ]; then
+  python3 -m venv "$APP/.venv"
+fi
+"$APP/.venv/bin/pip" install -q --upgrade pip
+"$APP/.venv/bin/pip" install -q -r "$APP/requirements.txt"
+chmod -R a+rX "$APP"
+chmod +x "$APP/run.sh" "$APP/main.py" /usr/bin/tangerine-linux || true
+exit 0
