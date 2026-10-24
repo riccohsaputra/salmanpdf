@@ -82,7 +82,9 @@ class ImageEditorDialog(QDialog):
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setMinimumSize(420, 420)
         self.err = QLabel("")
-        self.err.setStyleSheet("color:#ff8080")
+        self.err.setStyleSheet("color:#c0392b")
+        self.preview.setStyleSheet(
+            "background:#ffffff;border:1px solid #e3ded2;border-radius:12px")
 
         # --- Crop ---
         self.c_left = _SliderRow("Kiri", 45, 0)

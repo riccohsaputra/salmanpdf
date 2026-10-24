@@ -28,10 +28,14 @@ from PySide6.QtWidgets import QWidget
 from .converters import detect_kind, formats_for
 
 SIZE = 340
-SECTOR = QColor(40, 40, 40, 225)
+# Frosted glass ala Tangerine asli: putih transparan, teks gelap,
+# hover oranye + teks putih.
+SECTOR = QColor(255, 255, 255, 215)
 SECTOR_HOVER = QColor("#ff7a1a")
-CENTER = QColor(25, 25, 25, 235)
-TEXT = QColor("#ffffff")
+SECTOR_EDGE = QColor(0, 0, 0, 35)
+CENTER = QColor(255, 255, 255, 235)
+TEXT = QColor("#26221f")
+TEXT_HOVER = QColor("#ffffff")
 
 
 def sector_index(pos: QPointF, center: QPointF, inner: float,
@@ -149,14 +153,14 @@ class WheelOverlay(QWidget):
             path.arcTo(ro, start, span)
             path.arcTo(ri, start + span, -span)
             path.closeSubpath()
-            p.setPen(Qt.NoPen)
+            p.setPen(SECTOR_EDGE)
             p.setBrush(SECTOR_HOVER if hovered else SECTOR)
             p.drawPath(path)
             mid = math.radians(90 - (i + 0.5) * step)
             r_mid = (inner + r_out) / 2
             lx = center.x() + r_mid * math.cos(mid)
             ly = center.y() - r_mid * math.sin(mid)
-            p.setPen(TEXT)
+            p.setPen(TEXT_HOVER if hovered else TEXT)
             p.setFont(QFont("Sans", 15 if hovered else 13, QFont.Bold))
             p.drawText(QRectF(lx - 50, ly - 14, 100, 28), Qt.AlignCenter, fmt)
         p.setBrush(CENTER)

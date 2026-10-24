@@ -17,12 +17,16 @@ from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
 from PySide6.QtWidgets import QWidget
 
+# Palet "frosted glass" ala Tangerine asli: putih transparan, teks gelap,
+# sektor yang di-hover menyala oranye dengan teks putih.
 ORANGE = QColor("#ff7a1a")
 ORANGE_LIGHT = QColor("#ffa04d")
-DARK = QColor("#232323")
-SECTOR = QColor("#3a3a3a")
+DARK = QColor(255, 255, 255, 235)      # tengah wheel: putih kaca
+SECTOR = QColor(255, 255, 255, 215)    # sektor: putih transparan
 SECTOR_HOVER = QColor("#ff7a1a")
-TEXT = QColor("#ffffff")
+SECTOR_EDGE = QColor(0, 0, 0, 35)
+TEXT = QColor("#26221f")
+TEXT_HOVER = QColor("#ffffff")
 
 
 class WheelWidget(QWidget):
@@ -114,7 +118,7 @@ class WheelWidget(QWidget):
             path.arcTo(rect_out, start, span)
             path.arcTo(rect_in, start + span, -span)
             path.closeSubpath()
-            p.setPen(Qt.NoPen)
+            p.setPen(SECTOR_EDGE)
             p.setBrush(SECTOR_HOVER if hovered else SECTOR)
             p.drawPath(path)
 
@@ -124,7 +128,7 @@ class WheelWidget(QWidget):
             r_mid = (inner + r_out) / 2
             lx = center.x() + r_mid * math.cos(mid)
             ly = center.y() - r_mid * math.sin(mid)
-            p.setPen(TEXT)
+            p.setPen(TEXT_HOVER if hovered else TEXT)
             p.setFont(QFont("Sans", 15 if hovered else 13, QFont.Bold))
             p.drawText(QRectF(lx - 50, ly - 14, 100, 28), Qt.AlignCenter, fmt)
 

@@ -60,7 +60,7 @@ class DropZone(QLabel):
         self.setMinimumHeight(110)
         self.setStyleSheet(
             "QLabel{border:2px dashed #ff7a1a;border-radius:14px;"
-            "padding:18px;font-size:15px;color:#ddd;background:#2b2b2b}"
+            "padding:18px;font-size:15px;color:#26221f;background:#ffffff}"
         )
 
     def dragEnterEvent(self, event):  # noqa: N802
@@ -143,7 +143,6 @@ class MainWindow(QMainWindow):
         central = QWidget()
         central.setLayout(layout)
         self.setCentralWidget(central)
-        self.setStyleSheet("QMainWindow{background:#1e1e1e} QLabel{color:#eee}")
 
     # ------------------------------------------------------------- flow
     def on_files(self, files: list[Path]) -> None:
@@ -276,8 +275,24 @@ class MainWindow(QMainWindow):
         self.on_format(fmt)
 
 
+# Tema terang "frosted glass" ala Tangerine asli — berlaku app-wide,
+# termasuk dialog editor (menimpa tema gelap bawaan desktop).
+LIGHT_THEME = """
+QMainWindow, QDialog { background: #f6f4ef; }
+QLabel { color: #26221f; }
+QCheckBox { color: #26221f; }
+QPushButton { background: #ffffff; color: #26221f; border: 1px solid #d8d3c8;
+              border-radius: 8px; padding: 6px 10px; }
+QPushButton:hover { border-color: #ff7a1a; }
+QPushButton:disabled { color: #a49e93; background: #efece6; }
+QComboBox { background: #ffffff; color: #26221f; border: 1px solid #d8d3c8;
+            border-radius: 6px; padding: 4px; }
+"""
+
+
 def main() -> int:
     app = QApplication(sys.argv)
+    app.setStyleSheet(LIGHT_THEME)
     win = MainWindow()
     win.show()
     return app.exec()
