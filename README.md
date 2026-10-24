@@ -1,4 +1,4 @@
-# 🍊 Tangerine Linux — Prototipe v0.2.1 (drop-zone + mode global Shift+Drag)
+# 🍊 Tangerine Linux — Prototipe v0.3.0 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.
@@ -46,6 +46,20 @@ Syarat & keterbatasan jujur:
 | Video (MP4/MOV/MKV/WebM) | MP3, WAV, GIF | ffmpeg |
 | Audio (MP3/WAV/OGG/FLAC/M4A) | MP3, WAV, OGG | ffmpeg |
 | Teks (TXT/MD) | PDF | PyMuPDF |
+
+## Editor gambar: Crop & Add BG (v0.3.0)
+
+Drop **satu gambar** → tombol **"✂️ Crop & Add BG"** aktif. Di jendela editor
+(preview langsung berubah saat slider digeser):
+
+- **Crop** — potong sisi kiri/atas/kanan/bawah (slider %) + preset rasio
+  tengah: 1:1, 4:3, 3:4, 3:2, 2:3, 16:9, 9:16.
+- **Add BG** — gambar ditaruh di atas background warna (swatch oranye,
+  kuning, putih, hitam, abu, biru, hijau, ungu, atau warna bebas):
+  **Padding** (jarak tepi), **Corners** (sudut membulat), dan **Shadow**
+  (bayangan di sisi gambar — atur blur, geser/offset, dan gelapnya).
+
+Hasil disimpan sebagai file baru berakhiran `-edit` di sebelah file asli.
 
 Catatan jujur v1:
 - PDF → TXT hanya mengekstrak *text layer*. PDF hasil scan (gambar) akan
@@ -116,7 +130,7 @@ apa pun. Versi yang sedang jalan terlihat di judul jendela app.
 
 ```bash
 .venv/bin/pip install pytest
-.venv/bin/python -m pytest tests/ -q    # 12 test: mesin konversi + state machine Shift+Drag
+.venv/bin/python -m pytest tests/ -q    # 19 test: konversi + state machine Shift+Drag + edit gambar
 ```
 
 ## Struktur
@@ -125,6 +139,8 @@ apa pun. Versi yang sedang jalan terlihat di judul jendela app.
 main.py               entry point (GUI + CLI)
 tangerine/
   converters.py       mesin konversi + tabel routing wheel
+  imaging.py          crop + add background/shadow (murni Pillow, ter-test)
+  editor.py           dialog editor gambar (preview live + slider)
   wheel.py            widget radial wheel (QPainter, hit-test polar)
   overlay.py          wheel overlay global = drop-target XDND (v2)
   statemachine.py     state machine Shift+Drag (logika murni, ter-test)
@@ -136,6 +152,7 @@ tests/
 
 ## Roadmap berikutnya (belum dikerjakan)
 
-- Tools wheel kedua (tahan tombol lain): Crop, Add BG, kompres PDF/gambar.
+- Tools wheel kedua di mode global: sektor Crop / Add BG langsung di wheel.
+- Kompres PDF/gambar ke target ukuran file.
 - OCR untuk PDF scan (tesseract).
 - Tray mode: app sembunyi total sampai Shift+drag terdeteksi.

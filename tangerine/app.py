@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from .converters import ConversionError, convert_many, detect_kind, formats_for
+from .editor import ImageEditorDialog
 from .overlay import WheelOverlay
 from .statemachine import DragTracker
 from .wheel import WheelWidget
@@ -112,6 +113,10 @@ class MainWindow(QMainWindow):
         self.open_btn.clicked.connect(self.open_folder)
         self._last_folder: Path | None = None
 
+        self.edit_btn = QPushButton("✂️ Crop & Add BG (1 gambar)")
+        self.edit_btn.setEnabled(False)
+        self.edit_btn.clicked.connect(self.on_edit)
+
         # ---- Mode global Shift+Drag (v2, X11 eksperimental) ----
         self.global_btn = QPushButton("🖱️ Aktifkan mode global Shift+Drag (X11)")
         self.global_btn.clicked.connect(self.toggle_global)
@@ -129,6 +134,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.progress)
         layout.addWidget(self.status)
         btn_row = QHBoxLayout()
+        btn_row.addWidget(self.edit_btn)
         btn_row.addWidget(self.global_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.open_btn)
@@ -141,6 +147,7 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- flow
     def on_files(self, files: list[Path]) -> None:
+        self.edit_btn.setEnabled(False)
         supported = [f for f in files if detect_kind(f) is not None]
         skipped = [f.name for f in files if detect_kind(f) is None]
         if not supported:
@@ -161,6 +168,8 @@ class MainWindow(QMainWindow):
             return
         order = [f for f in formats_for(supported[0]) if f in common]
         self._files = supported
+        self.edit_btn.setEnabled(
+            len(supported) == 1 and detect_kind(supported[0]) == "image")
         kind = KIND_LABEL[detect_kind(supported[0])]
         names = ", ".join(f.name for f in supported[:3])
         if len(supported) > 3:
@@ -196,6 +205,17 @@ class MainWindow(QMainWindow):
     def on_failed(self, msg: str) -> None:
         self.progress.hide()
         self.status.setText(f"❌ {msg}")
+
+    def on_edit(self) -> None:
+        if len(self._files) != 1 or detect_kind(self._files[0]) != "image":
+            return
+        dlg = ImageEditorDialog(self._files[0], self)
+        if dlg.exec() and dlg.saved_path is not None:
+            self.status.setText(
+                f"✅ Hasil edit tersimpan: {dlg.saved_path.name} "
+                f"(di sebelah {self._files[0].name})")
+            self._last_folder = dlg.saved_path.parent
+            self.open_btn.show()
 
     def open_folder(self) -> None:
         if self._last_folder:
