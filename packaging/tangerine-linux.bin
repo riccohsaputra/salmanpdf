@@ -1,3 +1,0 @@
-#!/bin/sh
-# Launcher Tangerine Linux (terinstall via .deb)
-exec /opt/tangerine-linux/.venv/bin/python /opt/tangerine-linux/main.py "$@"
