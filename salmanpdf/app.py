@@ -262,20 +262,6 @@ class MainWindow(QMainWindow):
         brand.addWidget(brand_name)
         brand.addWidget(brand_tag)
         h_lay.addLayout(brand)
-        h_lay.addSpacing(34)
-        for nav_label, nav_key in (("GABUNG PDF", "gabung"),
-                                   ("PISAH PDF", "pisah"),
-                                   ("KOMPRES PDF", "kompres")):
-            nav_btn = QPushButton(nav_label)
-            nav_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            nav_btn.setStyleSheet(
-                "QPushButton{background:transparent;border:none;"
-                "font-size:11.5px;font-weight:700;color:#3c4043;"
-                "padding:6px 10px}"
-                "QPushButton:hover{color:#d92323}")
-            nav_btn.clicked.connect(
-                lambda _=False, k=nav_key: self.open_tool(k))
-            h_lay.addWidget(nav_btn)
         h_lay.addStretch(1)
         ver_lbl = QLabel(f"v{__version__}")
         ver_lbl.setStyleSheet("font-size:11px;color:#9aa0a8")
@@ -418,6 +404,8 @@ class MainWindow(QMainWindow):
         home_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         home_scroll.setStyleSheet("QScrollArea{background:#ffffff}")
+        home_scroll.viewport().setStyleSheet(
+            "background:#ffffff")
         home_scroll.setWidget(home_page)
         self._stack.addWidget(home_scroll)
         self._stack.addWidget(self._build_tool_page())
