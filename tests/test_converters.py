@@ -84,6 +84,6 @@ def test_text_to_pdf(tmp_path):
 
 def test_unsupported_raises(tmp_path):
     bad = tmp_path / "aneh.xyz"
-    bad.write_bytes(b"??")
+    bad.write_bytes(b"\x89\x00\xff\xfe" * 16)  # biner, bukan teks
     with pytest.raises(ConversionError):
         convert(bad, "PDF")

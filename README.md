@@ -1,4 +1,4 @@
-# 🍊 Tangerine Linux — Prototipe v0.3.2 (drop-zone + mode global Shift+Drag)
+# 🍊 Tangerine Linux — Prototipe v0.3.3 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.
@@ -45,7 +45,12 @@ Syarat & keterbatasan jujur:
 | Banyak gambar sekaligus | PDF (digabung jadi 1 PDF) | Pillow |
 | Video (MP4/MOV/MKV/WebM) | MP3, WAV, GIF | ffmpeg |
 | Audio (MP3/WAV/OGG/FLAC/M4A) | MP3, WAV, OGG | ffmpeg |
-| Teks (TXT/MD) | PDF | PyMuPDF |
+| Teks (TXT/MD/LOG/CSV/INI/SH/PY/JSON/dll) | PDF | PyMuPDF |
+
+Deteksi teks ala Linux (v0.3.3): file teks **tanpa ekstensi** atau dengan
+ekstensi asing tetap dikenali dari isinya (sniff: bukan biner + bisa
+di-decode sebagai teks), jadi tetap bisa dibuat PDF. File biner dan format
+paket/dokumen terkompresi (deb/zip/docx/dll) tidak akan ditebak sebagai teks.
 
 ## Editor gambar: Crop & Add BG (v0.3.0)
 

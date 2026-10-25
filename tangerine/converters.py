@@ -26,7 +26,44 @@ PDF_DPI = 200  # render PDF -> gambar
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm", ".avi"}
 AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".opus"}
-TEXT_EXTS = {".txt", ".md"}
+TEXT_EXTS = {
+    ".txt", ".text", ".md", ".markdown", ".log", ".csv", ".tsv",
+    ".ini", ".cfg", ".conf", ".config", ".sh", ".bash", ".zsh",
+    ".py", ".js", ".ts", ".json", ".yml", ".yaml", ".xml", ".sql",
+    ".java", ".c", ".cpp", ".h", ".php", ".rb", ".go", ".rs",
+}
+# Magic bytes biner yang TIDAK boleh ditebak sebagai teks.
+_BINARY_MAGIC = (
+    b"\x89PNG", b"\xff\xd8\xff", b"GIF8", b"%PDF", b"PK\x03\x04",
+    b"\x7fELF", b"ID3", b"OggS", b"\x1aE\xdf\xa3",  # PNG/JPEG/GIF/PDF/ZIP/ELF/MP3/OGG/WebM-MKV
+)
+
+
+def sniff_text(path: Path) -> bool:
+    """
+    Tebak file teks dari ISINYA (untuk file Linux yang sering tanpa
+    ekstensi, atau ekstensinya tak dikenal). Syarat: tidak ada byte NUL,
+    tidak cocok magic biner, dan mayoritas byte bisa di-decode UTF-8.
+    """
+    try:
+        if not path.is_file() or path.stat().st_size > 20 * 1024 * 1024:
+            return False
+        sample = path.read_bytes()[:8192]
+    except OSError:
+        return False
+    if not sample:
+        return False
+    if b"\x00" in sample or sample.startswith(_BINARY_MAGIC):
+        return False
+    try:
+        sample.decode("utf-8")
+        return True
+    except UnicodeDecodeError:
+        # Toleransi file teks encoding lama: coba latin-1 selektif —
+        # tolak kalau terlalu banyak karakter kontrol.
+        text = sample.decode("latin-1")
+        controls = sum(1 for c in text if ord(c) < 9 or (13 < ord(c) < 32))
+        return controls / max(len(text), 1) < 0.02
 
 
 class ConversionError(Exception):
@@ -44,6 +81,14 @@ def detect_kind(path: Path) -> str | None:
     if ext in AUDIO_EXTS:
         return "audio"
     if ext in TEXT_EXTS:
+        return "text"
+    # Fallback ala Linux: file tanpa ekstensi / ekstensi asing yang
+    # isinya teks polos tetap dianggap teks (-> bisa jadi PDF).
+    if ext in {".deb", ".zip", ".tar", ".gz", ".xz", ".bz2", ".7z", ".rar",
+               ".exe", ".bin", ".iso", ".img", ".db", ".sqlite", ".so", ".o",
+               ".docx", ".xlsx", ".pptx", ".odt"}:
+        return None
+    if sniff_text(path):
         return "text"
     return None
 

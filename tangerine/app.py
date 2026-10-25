@@ -77,7 +77,8 @@ class DropZone(QLabel):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Pilih file",
             "", "Didukung (*.pdf *.jpg *.jpeg *.png *.webp *.bmp *.tiff "
-                "*.mp4 *.mov *.mkv *.webm *.mp3 *.wav *.ogg *.flac *.txt *.md);;"
+                "*.mp4 *.mov *.mkv *.webm *.mp3 *.wav *.ogg *.flac "
+                "*.txt *.text *.md *.log *.csv *.ini *.cfg *.sh *.py *.json);;"
                 "Semua file (*)")
         if paths:
             self.filesDropped.emit([Path(p) for p in paths])
