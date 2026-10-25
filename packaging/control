@@ -3,7 +3,7 @@ Version: 0.2.0
 Section: utils
 Priority: optional
 Architecture: all
-Depends: python3, python3-venv, libegl1, libgl1, libxkbcommon0, ffmpeg
+Depends: python3, python3-venv, libegl1, libgl1, libxkbcommon0
 Maintainer: Ricco Herdiyan Saputra
 Description: Tangerine Linux v1 - drop-zone + radial wheel file converter
  Konversi file lokal ala Tangerine for Mac: seret file ke drop-zone,

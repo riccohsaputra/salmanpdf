@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 for lib in libEGL.so.1 libGL.so.1; do
   if ! ldconfig -p | grep -q "$lib"; then
     echo "⚠️  $lib belum ada. Install dulu:"
-    echo "    sudo apt install libegl1 libgl1 libxkbcommon0 ffmpeg"
+    echo "    sudo apt install libegl1 libgl1 libxkbcommon0"
   fi
 done
 

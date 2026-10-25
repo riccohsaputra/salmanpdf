@@ -1,4 +1,4 @@
-# 🍊 Tangerine Linux — Prototipe v0.3.3 (drop-zone + mode global Shift+Drag)
+# 🍊 Tangerine Linux — Prototipe v0.4.0 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.
@@ -36,21 +36,40 @@ Syarat & keterbatasan jujur:
 3. **Klik satu sektor** → file dikonversi → hasil disimpan **di sebelah file
    asli**, tidak pernah menimpa (`nama (1).jpg`, `nama (2).jpg`, …).
 
-## Yang sudah bisa (v1)
+## Yang sudah bisa
 
 | Input | Wheel (output) | Mesin |
 |---|---|---|
-| PDF | JPG, PNG (per halaman, 200 DPI), TXT | PyMuPDF |
+| PDF | JPG, PNG (per halaman, 200 DPI), TXT, **PISAH**, **KOMPRES** | PyMuPDF |
+| Banyak PDF sekaligus | **GABUNG** (+ semua format PDF di atas) | PyMuPDF |
 | Gambar (JPG/PNG/WebP/BMP/TIFF/GIF) | JPG, PNG, WebP, PDF | Pillow |
 | Banyak gambar sekaligus | PDF (digabung jadi 1 PDF) | Pillow |
-| Video (MP4/MOV/MKV/WebM) | MP3, WAV, GIF | ffmpeg |
-| Audio (MP3/WAV/OGG/FLAC/M4A) | MP3, WAV, OGG | ffmpeg |
+| Dokumen (DOCX/DOC/ODT/RTF) | PDF, TXT, DOCX, ODT | LibreOffice |
+| Presentasi (PPTX/PPT/ODP) | PDF, PPTX, ODP | LibreOffice |
+| Spreadsheet (XLSX/XLS/ODS) | PDF, CSV, XLSX, ODS | LibreOffice |
 | Teks (TXT/MD/LOG/CSV/INI/SH/PY/JSON/dll) | PDF | PyMuPDF |
+
+> Video & audio **sengaja tidak didukung** (dihapus di v0.4.0 atas
+> permintaan user — fokus ke dokumen, gambar, PDF). Konversi Office butuh
+> LibreOffice terinstall (`sudo apt install libreoffice`; di Linux Mint
+> biasanya sudah bawaan).
+
+**PDF tools (v0.4.0):** GABUNG = banyak PDF jadi satu; PISAH = satu PDF
+per halaman; KOMPRES = kecilkan PDF ke **target ukuran yang kamu tentukan
+sendiri** (dalam KB — resolusi & kualitas gambar di dalam PDF diturunkan
+bertahap sampai muat; hasil terkecil yang bisa dicapai dilaporkan apa
+adanya kalau target tidak tercapai).
+
+**Edit PDF (v0.4.0):** drop 1 PDF → tombol **"📝 Edit PDF"**. Tempel teks
+(pilih **font dari yang terinstall di sistem**, ukuran, dan **warna** via
+color picker) dan tempel gambar (logo/tanda tangan/foto) dengan **klik
+langsung di preview halaman** untuk menaruh posisinya. Hasil disimpan
+sebagai `-edit.pdf`, file asli tidak diubah.
 
 Deteksi teks ala Linux (v0.3.3): file teks **tanpa ekstensi** atau dengan
 ekstensi asing tetap dikenali dari isinya (sniff: bukan biner + bisa
 di-decode sebagai teks), jadi tetap bisa dibuat PDF. File biner dan format
-paket/dokumen terkompresi (deb/zip/docx/dll) tidak akan ditebak sebagai teks.
+paket/dokumen terkompresi (deb/zip/dll) tidak akan ditebak sebagai teks.
 
 ## Editor gambar: Crop & Add BG (v0.3.0)
 
@@ -76,7 +95,7 @@ Catatan jujur v1:
 ## Jalanin di Linux Mint
 
 ```bash
-sudo apt install python3-venv libegl1 libgl1 libxkbcommon0 ffmpeg
+sudo apt install python3-venv libegl1 libgl1 libxkbcommon0
 unzip tangerine-linux-v1.zip && cd tangerine-linux
 ./run.sh
 ```

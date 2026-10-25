@@ -36,7 +36,7 @@ def sample_png(tmp_path) -> Path:
 def test_detect_and_formats(sample_pdf, sample_png):
     assert detect_kind(sample_pdf) == "pdf"
     assert detect_kind(sample_png) == "image"
-    assert formats_for(sample_pdf) == ["JPG", "PNG", "TXT"]
+    assert formats_for(sample_pdf) == ["JPG", "PNG", "TXT", "PISAH", "KOMPRES"]
     assert "PNG" not in formats_for(sample_png)  # format sendiri dibuang
     assert "PDF" in formats_for(sample_png)
 

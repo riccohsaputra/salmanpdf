@@ -1,12 +1,16 @@
 """
-Mesin konversi lokal Tangerine Linux v1.
+Mesin konversi lokal Tangerine Linux.
 
 Semua konversi jalan lokal (tanpa upload):
 - PDF  <-> gambar : PyMuPDF (render) + Pillow
-- Gambar -> PDF   : Pillow
+- Gambar -> PDF   : Pillow (banyak gambar = digabung satu PDF)
 - PDF  -> TXT     : PyMuPDF text extraction (bukan OCR)
-- Video/audio     : ffmpeg (jika terinstall)
+- PDF tools       : GABUNG (merge), PISAH (split), KOMPRES (target size)
+- Office          : LibreOffice headless (soffice) untuk docx/pptx/xlsx/odt/dll
 - TXT  -> PDF     : PyMuPDF
+
+(Video/audio SENGAJA tidak didukung — dihapus atas permintaan user,
+ fokus ke dokumen, gambar, dan PDF.)
 
 Aturan output (meniru Tangerine asli):
 - Hasil selalu disimpan DI SEBELAH file asli.
@@ -14,8 +18,10 @@ Aturan output (meniru Tangerine asli):
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pymupdf
@@ -24,8 +30,9 @@ from PIL import Image
 PDF_DPI = 200  # render PDF -> gambar
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
-VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm", ".avi"}
-AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".opus"}
+WORD_EXTS = {".docx", ".doc", ".odt", ".rtf"}
+SLIDE_EXTS = {".pptx", ".ppt", ".odp"}
+SHEET_EXTS = {".xlsx", ".xls", ".ods"}
 TEXT_EXTS = {
     ".txt", ".text", ".md", ".markdown", ".log", ".csv", ".tsv",
     ".ini", ".cfg", ".conf", ".config", ".sh", ".bash", ".zsh",
@@ -76,17 +83,18 @@ def detect_kind(path: Path) -> str | None:
         return "pdf"
     if ext in IMAGE_EXTS:
         return "image"
-    if ext in VIDEO_EXTS:
-        return "video"
-    if ext in AUDIO_EXTS:
-        return "audio"
+    if ext in WORD_EXTS:
+        return "word"
+    if ext in SLIDE_EXTS:
+        return "slides"
+    if ext in SHEET_EXTS:
+        return "sheet"
     if ext in TEXT_EXTS:
         return "text"
     # Fallback ala Linux: file tanpa ekstensi / ekstensi asing yang
     # isinya teks polos tetap dianggap teks (-> bisa jadi PDF).
     if ext in {".deb", ".zip", ".tar", ".gz", ".xz", ".bz2", ".7z", ".rar",
-               ".exe", ".bin", ".iso", ".img", ".db", ".sqlite", ".so", ".o",
-               ".docx", ".xlsx", ".pptx", ".odt"}:
+               ".exe", ".bin", ".iso", ".img", ".db", ".sqlite", ".so", ".o"}:
         return None
     if sniff_text(path):
         return "text"
@@ -94,11 +102,13 @@ def detect_kind(path: Path) -> str | None:
 
 
 # Tabel routing: tipe input -> format output yang ditawarkan wheel.
+# GABUNG tidak di sini (khusus multi-PDF, ditangani convert_many + app).
 ROUTES: dict[str, list[str]] = {
-    "pdf": ["JPG", "PNG", "TXT"],
+    "pdf": ["JPG", "PNG", "TXT", "PISAH", "KOMPRES"],
     "image": ["JPG", "PNG", "WEBP", "PDF"],
-    "video": ["MP3", "GIF", "WAV"],
-    "audio": ["MP3", "WAV", "OGG"],
+    "word": ["PDF", "TXT", "DOCX", "ODT"],
+    "slides": ["PDF", "PPTX", "ODP"],
+    "sheet": ["PDF", "CSV", "XLSX", "ODS"],
     "text": ["PDF"],
 }
 
@@ -224,34 +234,121 @@ def images_to_pdf(srcs: list[Path]) -> list[Path]:
     return [dest]
 
 
-# ---------------------------------------------------------------- Media (ffmpeg)
-def _ffmpeg(args: list[str]) -> None:
-    if shutil.which("ffmpeg") is None:
-        raise ConversionError("ffmpeg belum terinstall (sudo apt install ffmpeg).")
-    proc = subprocess.run(["ffmpeg", "-y", "-v", "error", *args],
-                          capture_output=True, text=True)
-    if proc.returncode != 0:
-        raise ConversionError(f"ffmpeg gagal: {proc.stderr.strip()[:300]}")
+# ---------------------------------------------------------------- PDF tools
+def merge_pdfs(srcs: list[Path]) -> list[Path]:
+    """Gabung banyak PDF -> satu PDF (urutan = urutan drop)."""
+    if len(srcs) < 2:
+        raise ConversionError("GABUNG butuh minimal 2 file PDF.")
+    dest = unique_output(srcs[0], "pdf", "-gabung")
+    out = pymupdf.open()
+    try:
+        for s in srcs:
+            with pymupdf.open(s) as d:
+                out.insert_pdf(d)
+    except Exception as e:
+        raise ConversionError(f"Gagal menggabung PDF: {e}") from e
+    out.save(dest, garbage=3, deflate=True)
+    out.close()
+    return [dest]
 
 
-def media_convert(src: Path, fmt: str) -> list[Path]:
-    dest = unique_output(src, fmt)
-    f = fmt.upper()
-    if f == "MP3":
-        _ffmpeg(["-i", str(src), "-vn", "-codec:a", "libmp3lame", "-q:a", "2", str(dest)])
-    elif f == "WAV":
-        _ffmpeg(["-i", str(src), "-vn", "-codec:a", "pcm_s16le", str(dest)])
-    elif f == "OGG":
-        _ffmpeg(["-i", str(src), "-codec:a", "libvorbis", "-q:a", "4", str(dest)])
-    elif f == "GIF":
-        _ffmpeg(["-i", str(src), "-vf", "fps=10,scale=480:-1:flags=lanczos", str(dest)])
-    else:
-        raise ConversionError(f"Format media tidak didukung: {fmt}")
+def split_pdf(src: Path) -> list[Path]:
+    """Pisah PDF -> satu PDF per halaman (-hal001, -hal002, ...)."""
+    try:
+        doc = pymupdf.open(src)
+    except Exception as e:
+        raise ConversionError(f"PDF tidak bisa dibuka: {e}") from e
+    out: list[Path] = []
+    for i in range(doc.page_count):
+        dest = unique_output(src, "pdf", f"-hal{i + 1:03d}")
+        single = pymupdf.open()
+        single.insert_pdf(doc, from_page=i, to_page=i)
+        single.save(dest)
+        single.close()
+        out.append(dest)
+    doc.close()
+    if not out:
+        raise ConversionError("PDF kosong (0 halaman).")
+    return out
+
+
+def compress_pdf(src: Path, target_bytes: int) -> list[Path]:
+    """
+    Kompres PDF mendekati target ukuran user: turunkan resolusi+kualitas
+    gambar tersemat bertahap (rewrite_images) sampai <= target. Kalau
+    target tidak tercapai (PDF dominan teks/vektor), kembalikan hasil
+    terkecil yang bisa dicapai.
+    """
+    if not target_bytes or target_bytes <= 0:
+        raise ConversionError("KOMPRES butuh target ukuran (byte) dari user.")
+    ladder: list[tuple[int | None, int]] = [
+        (None, 0),      # lossless saja dulu (buang sampah + deflate)
+        (220, 85), (180, 75), (150, 65), (120, 55),
+        (96, 45), (72, 35), (50, 25),
+    ]
+    best_path: Path | None = None
+    best_size = float("inf")
+    tmpdir = Path(tempfile.mkdtemp(prefix="tng-kompres-"))
+    try:
+        for dpi, quality in ladder:
+            cand = tmpdir / f"coba-{dpi or 'lossless'}.pdf"
+            try:
+                doc = pymupdf.open(src)
+                if dpi is not None:
+                    # Syarat PyMuPDF: dpi_target HARUS < dpi_threshold.
+                    doc.rewrite_images(dpi_threshold=dpi + 40, dpi_target=dpi,
+                                       quality=quality)
+                doc.save(cand, garbage=4, deflate=True)
+                doc.close()
+            except Exception:
+                continue
+            size = cand.stat().st_size
+            if size < best_size:
+                best_size, best_path = size, cand
+            if size <= target_bytes:
+                break
+        if best_path is None:
+            raise ConversionError("Kompresi gagal total (PDF rusak?).")
+        dest = unique_output(src, "pdf", "-kompres")
+        shutil.copy2(best_path, dest)
+        return [dest]
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ---------------------------------------------------------------- Office (LibreOffice)
+def office_convert(src: Path, fmt: str) -> list[Path]:
+    """
+    Konversi dokumen Office via LibreOffice headless (soffice).
+    Mendukung word/slides/sheet -> PDF/TXT/DOCX/ODT/PPTX/ODP/CSV/XLSX/ODS
+    sesuai ROUTES. Output ditulis ke temp dulu lalu dipindah ke sebelah
+    file asli dengan nama unik.
+    """
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        raise ConversionError(
+            "LibreOffice belum terinstall. Install dulu: sudo apt install libreoffice")
+    target = fmt.lower()
+    convert_arg = "txt:Text" if target == "txt" else target
+    with tempfile.TemporaryDirectory(prefix="tng-office-") as td:
+        env = dict(os.environ)
+        env["HOME"] = td  # profil LO terisolasi, hindari lock instance GUI
+        proc = subprocess.run(
+            [soffice, "--headless", "--norestore",
+             f"-env:UserInstallation=file://{td}/profile",
+             "--convert-to", convert_arg, "--outdir", td, str(src)],
+            capture_output=True, text=True, timeout=240, env=env)
+        produced = Path(td) / f"{src.stem}.{target}"
+        if proc.returncode != 0 or not produced.exists():
+            detail = (proc.stderr or proc.stdout or "").strip()[:200]
+            raise ConversionError(f"LibreOffice gagal mengonversi: {detail}")
+        dest = unique_output(src, target)
+        shutil.move(str(produced), str(dest))
     return [dest]
 
 
 # ---------------------------------------------------------------- API utama
-def convert(src: Path, fmt: str) -> list[Path]:
+def convert(src: Path, fmt: str, *, target_bytes: int | None = None) -> list[Path]:
     """Konversi satu file ke format target. Return daftar file hasil."""
     fmt = fmt.upper()
     kind = detect_kind(src)
@@ -262,25 +359,36 @@ def convert(src: Path, fmt: str) -> list[Path]:
     if kind == "pdf":
         if fmt in ("JPG", "PNG"):
             return pdf_to_images(src, fmt)
-        return pdf_to_text(src)
+        if fmt == "TXT":
+            return pdf_to_text(src)
+        if fmt == "PISAH":
+            return split_pdf(src)
+        return compress_pdf(src, target_bytes or 0)  # KOMPRES
     if kind == "image":
         if fmt == "PDF":
             return images_to_pdf([src])
         return image_to_image(src, fmt)
     if kind == "text":
         return text_to_pdf(src)
-    return media_convert(src, fmt)  # video / audio
+    return office_convert(src, fmt)  # word / slides / sheet
 
 
-def convert_many(srcs: list[Path], fmt: str) -> list[Path]:
+def convert_many(srcs: list[Path], fmt: str, *,
+                 target_bytes: int | None = None) -> list[Path]:
     """
-    Konversi batch. Kasus khusus: banyak gambar -> PDF digabung jadi SATU PDF
-    (meniru fitur merge Tangerine). Selain itu tiap file dikonversi sendiri.
+    Konversi batch. Kasus khusus:
+    - banyak gambar -> PDF digabung jadi SATU PDF
+    - GABUNG + banyak PDF -> satu PDF gabungan
+    Selain itu tiap file dikonversi sendiri.
     """
     fmt = fmt.upper()
+    if fmt == "GABUNG":
+        if not all(detect_kind(s) == "pdf" for s in srcs):
+            raise ConversionError("GABUNG hanya untuk file PDF semua.")
+        return merge_pdfs(srcs)
     if fmt == "PDF" and len(srcs) > 1 and all(detect_kind(s) == "image" for s in srcs):
         return images_to_pdf(srcs)
     out: list[Path] = []
     for s in srcs:
-        out.extend(convert(s, fmt))
+        out.extend(convert(s, fmt, target_bytes=target_bytes))
     return out

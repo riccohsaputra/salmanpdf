@@ -16,20 +16,21 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QHBoxLayout, QLabel, QMainWindow,
-    QProgressBar, QPushButton, QVBoxLayout, QWidget,
+    QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
+    QMainWindow, QProgressBar, QPushButton, QVBoxLayout, QWidget,
 )
 
 from .converters import ConversionError, convert_many, detect_kind, formats_for
 from .editor import ImageEditorDialog
 from .overlay import WheelOverlay
+from .pdf_editor import PdfEditorDialog
 from .statemachine import DragTracker
 from .wheel import WheelWidget
 from .xpoll import X11Poller, session_is_x11
 
 KIND_LABEL = {
-    "pdf": "PDF", "image": "Gambar", "video": "Video",
-    "audio": "Audio", "text": "Teks",
+    "pdf": "PDF", "image": "Gambar", "text": "Teks",
+    "word": "Dokumen Word", "slides": "Presentasi", "sheet": "Spreadsheet",
 }
 
 
@@ -37,13 +38,16 @@ class ConvertWorker(QThread):
     done = Signal(list)
     failed = Signal(str)
 
-    def __init__(self, files: list[Path], fmt: str):
+    def __init__(self, files: list[Path], fmt: str,
+                 target_bytes: int | None = None):
         super().__init__()
         self._files, self._fmt = files, fmt
+        self._target = target_bytes
 
     def run(self) -> None:
         try:
-            self.done.emit([str(p) for p in convert_many(self._files, self._fmt)])
+            self.done.emit([str(p) for p in convert_many(
+                self._files, self._fmt, target_bytes=self._target)])
         except ConversionError as e:
             self.failed.emit(str(e))
         except Exception as e:  # jaga-jaga: jangan sampai thread mati diam-diam
@@ -54,7 +58,8 @@ class DropZone(QLabel):
     filesDropped = Signal(list)
 
     def __init__(self):
-        super().__init__("🍊\n\nSeret file ke sini\natau klik untuk memilih file")
+        super().__init__("🍊\n\nSeret file ke sini\natau klik untuk memilih file\n"
+                         "(PDF • Gambar • Teks • Dokumen Office)")
         self.setAlignment(Qt.AlignCenter)
         self.setAcceptDrops(True)
         self.setMinimumHeight(110)
@@ -77,7 +82,8 @@ class DropZone(QLabel):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Pilih file",
             "", "Didukung (*.pdf *.jpg *.jpeg *.png *.webp *.bmp *.tiff "
-                "*.mp4 *.mov *.mkv *.webm *.mp3 *.wav *.ogg *.flac "
+                "*.docx *.doc *.odt *.rtf *.pptx *.ppt *.odp "
+                "*.xlsx *.xls *.ods "
                 "*.txt *.text *.md *.log *.csv *.ini *.cfg *.sh *.py *.json);;"
                 "Semua file (*)")
         if paths:
@@ -118,6 +124,10 @@ class MainWindow(QMainWindow):
         self.edit_btn.setEnabled(False)
         self.edit_btn.clicked.connect(self.on_edit)
 
+        self.pdfedit_btn = QPushButton("📝 Edit PDF (1 file PDF)")
+        self.pdfedit_btn.setEnabled(False)
+        self.pdfedit_btn.clicked.connect(self.on_pdf_edit)
+
         # ---- Mode global Shift+Drag (v2, X11 eksperimental) ----
         self.global_btn = QPushButton("🖱️ Aktifkan mode global Shift+Drag (X11)")
         self.global_btn.clicked.connect(self.toggle_global)
@@ -136,6 +146,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.status)
         btn_row = QHBoxLayout()
         btn_row.addWidget(self.edit_btn)
+        btn_row.addWidget(self.pdfedit_btn)
         btn_row.addWidget(self.global_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.open_btn)
@@ -148,6 +159,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------- flow
     def on_files(self, files: list[Path]) -> None:
         self.edit_btn.setEnabled(False)
+        self.pdfedit_btn.setEnabled(False)
         supported = [f for f in files if detect_kind(f) is not None]
         skipped = [f.name for f in files if detect_kind(f) is None]
         if not supported:
@@ -167,9 +179,13 @@ class MainWindow(QMainWindow):
             self.status.setText("⚠️ Nggak ada format tujuan yang sama untuk file-file ini.")
             return
         order = [f for f in formats_for(supported[0]) if f in common]
+        if len(supported) > 1 and all(detect_kind(f) == "pdf" for f in supported):
+            order.append("GABUNG")  # fitur merge khusus multi-PDF
         self._files = supported
         self.edit_btn.setEnabled(
             len(supported) == 1 and detect_kind(supported[0]) == "image")
+        self.pdfedit_btn.setEnabled(
+            len(supported) == 1 and detect_kind(supported[0]) == "pdf")
         kind = KIND_LABEL[detect_kind(supported[0])]
         names = ", ".join(f.name for f in supported[:3])
         if len(supported) > 3:
@@ -187,9 +203,22 @@ class MainWindow(QMainWindow):
     def on_format(self, fmt: str) -> None:
         if not self._files or (self._worker and self._worker.isRunning()):
             return
+        target_bytes: int | None = None
+        self._kompres_target = None
+        if fmt == "KOMPRES":
+            # User menentukan target ukuran sendiri (dalam KB).
+            size_kb = max(1, self._files[0].stat().st_size // 1024)
+            kb, ok = QInputDialog.getInt(
+                self, "Kompres PDF",
+                f"Ukuran sekarang: {size_kb} KB.\nTarget ukuran hasil (KB):",
+                max(10, size_kb // 2), 10, max(20, size_kb), 10)
+            if not ok:
+                return
+            target_bytes = kb * 1024
+            self._kompres_target = kb
         self.progress.show()
         self.status.setText(f"⏳ Mengonversi ke {fmt}…")
-        self._worker = ConvertWorker(self._files, fmt)
+        self._worker = ConvertWorker(self._files, fmt, target_bytes)
         self._worker.done.connect(self.on_done)
         self._worker.failed.connect(self.on_failed)
         self._worker.start()
@@ -197,7 +226,15 @@ class MainWindow(QMainWindow):
     def on_done(self, outputs: list) -> None:
         self.progress.hide()
         names = "\n".join(f"• {Path(o).name}" for o in outputs)
-        self.status.setText(f"✅ Beres! {len(outputs)} file hasil:\n{names}")
+        note = ""
+        if getattr(self, "_kompres_target", None) and outputs:
+            got_kb = Path(outputs[0]).stat().st_size // 1024
+            note = (f"\n📦 Ukuran hasil: {got_kb} KB "
+                    f"(target {self._kompres_target} KB)"
+                    + ("" if got_kb <= self._kompres_target
+                       else " — target tidak tercapai penuh, ini hasil "
+                            "terkecil yang bisa dicapai."))
+        self.status.setText(f"✅ Beres! {len(outputs)} file hasil:\n{names}{note}")
         if outputs:
             self._last_folder = Path(outputs[0]).parent
             self.open_btn.show()
@@ -213,6 +250,17 @@ class MainWindow(QMainWindow):
         if dlg.exec() and dlg.saved_path is not None:
             self.status.setText(
                 f"✅ Hasil edit tersimpan: {dlg.saved_path.name} "
+                f"(di sebelah {self._files[0].name})")
+            self._last_folder = dlg.saved_path.parent
+            self.open_btn.show()
+
+    def on_pdf_edit(self) -> None:
+        if len(self._files) != 1 or detect_kind(self._files[0]) != "pdf":
+            return
+        dlg = PdfEditorDialog(self._files[0], self)
+        if dlg.exec() and dlg.saved_path is not None:
+            self.status.setText(
+                f"✅ Hasil edit PDF tersimpan: {dlg.saved_path.name} "
                 f"(di sebelah {self._files[0].name})")
             self._last_folder = dlg.saved_path.parent
             self.open_btn.show()
@@ -288,6 +336,9 @@ QPushButton:hover { border-color: #ff7a1a; }
 QPushButton:disabled { color: #a49e93; background: #efece6; }
 QComboBox { background: #ffffff; color: #26221f; border: 1px solid #d8d3c8;
             border-radius: 6px; padding: 4px; }
+QLineEdit, QSpinBox { background: #ffffff; color: #26221f;
+            border: 1px solid #d8d3c8; border-radius: 6px; padding: 4px; }
+QRadioButton { color: #26221f; }
 """
 
 
