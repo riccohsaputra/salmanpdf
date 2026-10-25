@@ -285,6 +285,10 @@ class MainWindow(QMainWindow):
         hero_sub.setAlignment(Qt.AlignCenter)
         hero_sub.setWordWrap(True)
         hero_sub.setMaximumWidth(920)
+        # QLabel word-wrap di VBox sering salah hitung tinggi (teks
+        # kegencet/terpotong vertikal — dilaporkan Ricco 2026-10-25).
+        # Kunci tinggi minimum 2 baris supaya selalu lega.
+        hero_sub.setMinimumHeight(48)
         hero_sub.setStyleSheet("font-size:14.5px;color:#6b7280")
 
         # ================= Filter pills (ala iLovePDF) =================
