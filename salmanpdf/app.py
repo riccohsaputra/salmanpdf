@@ -323,11 +323,11 @@ class MainWindow(QMainWindow):
             "edit", "Edit PDF", "Tempel teks & gambar ke dalam PDF", "edit")
         self.card_editpdf.clicked.connect(lambda: self.open_tool("editpdf"))
         self.card_pdfimg = ToolCard(
-            "pdfimg", "PDF ke Gambar", "Ubah tiap halaman PDF menjadi JPG",
+            "pdfimg", "PDF ke JPG", "Ubah tiap halaman PDF menjadi JPG",
             "konversi")
         self.card_pdfimg.clicked.connect(lambda: self.open_tool("pdfimg"))
         self.card_imgpdf = ToolCard(
-            "imgpdf", "Gambar ke PDF", "Jadikan gambar (banyak sekaligus) satu PDF",
+            "imgpdf", "JPG ke PDF", "Ubah gambar JPG menjadi PDF dalam sekejap",
             "konversi")
         self.card_imgpdf.clicked.connect(lambda: self.open_tool("imgpdf"))
         self.card_office = ToolCard(
