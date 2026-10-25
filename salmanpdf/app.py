@@ -23,7 +23,7 @@ from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
-    QStackedWidget, QVBoxLayout, QWidget,
+    QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 FILE_FILTER = (
@@ -126,7 +126,7 @@ class ToolCard(QFrame):
     tebal di bawahnya, deskripsi abu. Tinggi tetap, flat, hover merah."""
 
     clicked = Signal()
-    HEIGHT = 138
+    MIN_HEIGHT = 138
 
     def __init__(self, icon: str, title: str, desc: str, category: str):
         super().__init__()
@@ -135,7 +135,11 @@ class ToolCard(QFrame):
         self._icon_name = icon
         self.setStyleSheet(_CARD_BASE)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setFixedHeight(self.HEIGHT)
+        # Fleksibel: kartu ikut meregang mengisi ruang saat jendela
+        # di-maximize (dulu fixed height -> grid penuh celah kosong).
+        self.setMinimumHeight(self.MIN_HEIGHT)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,
+                           QSizePolicy.Policy.Expanding)
         self._desc = desc
         self.icon_lbl = QLabel()
         self.icon_lbl.setFixedSize(56, 56)
@@ -149,6 +153,10 @@ class ToolCard(QFrame):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 12, 14, 10)
         lay.setSpacing(6)
+        # Konten berkelompok di TENGAH kartu: saat kartu meregang tinggi,
+        # ikon+judul+deskripsi tetap kompak di tengah, bukan tenggelam
+        # di atas dengan ruang kosong besar di bawahnya.
+        lay.addStretch(1)
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.title_lbl)
         lay.addWidget(self.desc_lbl)
@@ -324,7 +332,12 @@ class MainWindow(QMainWindow):
         wheel_box.setStyleSheet(
             "#wheelBox{background:#ffffff;border:1px solid #e7e1dc;"
             "border-radius:14px}")
-        wheel_box.setFixedSize(248, 248)
+        # Fleksibel mengikuti tinggi sidebar, dibatasi supaya wheel
+        # tidak jadi kartu raksasa kurus saat maximize.
+        wheel_box.setMinimumSize(248, 248)
+        wheel_box.setMaximumHeight(380)
+        wheel_box.setSizePolicy(QSizePolicy.Policy.Expanding,
+                                QSizePolicy.Policy.Expanding)
         wb_lay = QVBoxLayout(wheel_box)
         wb_lay.setContentsMargins(8, 8, 8, 8)
         wb_lay.addWidget(self.wheel)
@@ -352,7 +365,7 @@ class MainWindow(QMainWindow):
         body.addLayout(pills_row)
         body.addLayout(content_row, 1)
         inner = QWidget()
-        inner.setMaximumWidth(1180)
+        inner.setMaximumWidth(1560)
         inner.setLayout(body)
         home_outer = QHBoxLayout()
         home_outer.setContentsMargins(0, 0, 0, 0)
