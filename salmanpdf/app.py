@@ -15,9 +15,11 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
-    QMainWindow, QProgressBar, QPushButton, QVBoxLayout, QWidget,
+    QApplication, QFileDialog, QFrame, QGraphicsDropShadowEffect,
+    QHBoxLayout, QInputDialog, QLabel, QMainWindow, QProgressBar,
+    QPushButton, QVBoxLayout, QWidget,
 )
 
 from .converters import ConversionError, convert_many, detect_kind, formats_for
@@ -62,11 +64,17 @@ class DropZone(QLabel):
                          "(PDF • Gambar • Teks • Dokumen Office)")
         self.setAlignment(Qt.AlignCenter)
         self.setAcceptDrops(True)
-        self.setMinimumHeight(110)
+        self.setMinimumHeight(190)
         self.setStyleSheet(
-            "QLabel{border:2px dashed #ff7a1a;border-radius:14px;"
-            "padding:18px;font-size:15px;color:#26221f;background:#ffffff}"
+            "QLabel{border:2px dashed #d92323;border-radius:20px;"
+            "padding:22px;font-size:16px;color:#26221f;background:#ffffff}"
         )
+        # Bayangan kemerahan lembut — efek "kartu melayang" (Floating Cards)
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(30)
+        shadow.setOffset(0, 8)
+        shadow.setColor(QColor(217, 35, 35, 42))
+        self.setGraphicsEffect(shadow)
 
     def dragEnterEvent(self, event):  # noqa: N802
         if event.mimeData().hasUrls():
@@ -95,7 +103,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         from . import __version__
         self.setWindowTitle(f"SalmanPDF 📄 — v{__version__}")
-        self.resize(520, 640)
+        self.resize(980, 620)  # layout desktop lebar (Floating Cards)
         self._files: list[Path] = []
         self._worker: ConvertWorker | None = None
 
@@ -138,12 +146,38 @@ class MainWindow(QMainWindow):
         self._poll_timer.setInterval(25)
         self._poll_timer.timeout.connect(self._poll_global)
 
+        # ---- Layout desktop "Floating Cards" (v0.5.0): kartu drop-zone
+        # melayang di kiri, kartu wheel melayang di kanan, putih + merah.
+        self.wheel_card = QFrame()
+        self.wheel_card.setStyleSheet(
+            "QFrame{background:#ffffff;border:1px solid #f3d9d7;"
+            "border-radius:20px}")
+        wheel_shadow = QGraphicsDropShadowEffect(self.wheel_card)
+        wheel_shadow.setBlurRadius(30)
+        wheel_shadow.setOffset(0, 8)
+        wheel_shadow.setColor(QColor(217, 35, 35, 42))
+        self.wheel_card.setGraphicsEffect(wheel_shadow)
+        card_layout = QVBoxLayout(self.wheel_card)
+        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.addWidget(self.wheel)
+
+        left_col = QVBoxLayout()
+        left_col.setSpacing(12)
+        left_col.addWidget(self.drop)
+        left_col.addWidget(self.info)
+        left_col.addWidget(self.progress)
+        left_col.addWidget(self.status)
+        left_col.addStretch(1)
+
+        main_row = QHBoxLayout()
+        main_row.setSpacing(18)
+        main_row.addLayout(left_col, stretch=3)
+        main_row.addWidget(self.wheel_card, stretch=2)
+
         layout = QVBoxLayout()
-        layout.addWidget(self.drop)
-        layout.addWidget(self.info)
-        layout.addWidget(self.wheel, stretch=1)
-        layout.addWidget(self.progress)
-        layout.addWidget(self.status)
+        layout.setContentsMargins(18, 18, 18, 14)
+        layout.setSpacing(14)
+        layout.addLayout(main_row, stretch=1)
         btn_row = QHBoxLayout()
         btn_row.addWidget(self.edit_btn)
         btn_row.addWidget(self.pdfedit_btn)
@@ -327,12 +361,12 @@ class MainWindow(QMainWindow):
 # Tema terang "frosted glass" ala Tangerine asli — berlaku app-wide,
 # termasuk dialog editor (menimpa tema gelap bawaan desktop).
 LIGHT_THEME = """
-QMainWindow, QDialog { background: #f6f4ef; }
+QMainWindow, QDialog { background: #fbf9f9; }
 QLabel { color: #26221f; }
 QCheckBox { color: #26221f; }
-QPushButton { background: #ffffff; color: #26221f; border: 1px solid #d8d3c8;
-              border-radius: 8px; padding: 6px 10px; }
-QPushButton:hover { border-color: #ff7a1a; }
+QPushButton { background: #ffffff; color: #26221f; border: 1px solid #e3d5d3;
+              border-radius: 10px; padding: 8px 12px; }
+QPushButton:hover { border-color: #d92323; color: #d92323; }
 QPushButton:disabled { color: #a49e93; background: #efece6; }
 QComboBox { background: #ffffff; color: #26221f; border: 1px solid #d8d3c8;
             border-radius: 6px; padding: 4px; }

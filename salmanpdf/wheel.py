@@ -3,7 +3,7 @@ Radial wheel widget — jantungnya SalmanPDF.
 
 Wheel digambar manual pakai QPainter (annular sectors / donat):
 - Tiap sektor = satu format output.
-- Hover: sektor membesar + menyala oranye.
+- Hover: sektor membesar + menyala merah.
 - Klik sektor -> signal formatSelected(str).
 - Tengah: nama file sumber.
 
@@ -18,12 +18,12 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
 from PySide6.QtWidgets import QWidget
 
 # Palet "frosted glass" ala Tangerine asli: putih transparan, teks gelap,
-# sektor yang di-hover menyala oranye dengan teks putih.
-ORANGE = QColor("#ff7a1a")
-ORANGE_LIGHT = QColor("#ffa04d")
+# sektor yang di-hover menyala merah dengan teks putih.
+RED = QColor("#d92323")
+RED_LIGHT = QColor("#ff6b61")
 DARK = QColor(255, 255, 255, 235)      # tengah wheel: putih kaca
 SECTOR = QColor(255, 255, 255, 215)    # sektor: putih transparan
-SECTOR_HOVER = QColor("#ff7a1a")
+SECTOR_HOVER = QColor("#d92323")
 SECTOR_EDGE = QColor(0, 0, 0, 70)
 TEXT = QColor("#26221f")
 TEXT_HOVER = QColor("#ffffff")
@@ -134,7 +134,7 @@ class WheelWidget(QWidget):
 
         # Lingkaran tengah
         p.setBrush(DARK)
-        p.setPen(ORANGE)
+        p.setPen(RED)
         rect_in = QRectF(center.x() - inner, center.y() - inner, inner * 2, inner * 2)
         p.drawEllipse(rect_in)
         p.setPen(TEXT)

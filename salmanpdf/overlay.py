@@ -29,9 +29,9 @@ from .converters import detect_kind, formats_for
 
 SIZE = 340
 # Frosted glass ala Tangerine asli: putih transparan, teks gelap,
-# hover oranye + teks putih.
+# hover merah + teks putih.
 SECTOR = QColor(255, 255, 255, 215)
-SECTOR_HOVER = QColor("#ff7a1a")
+SECTOR_HOVER = QColor("#d92323")
 SECTOR_EDGE = QColor(0, 0, 0, 70)
 CENTER = QColor(255, 255, 255, 235)
 TEXT = QColor("#26221f")
@@ -182,7 +182,7 @@ class WheelOverlay(QWidget):
             p.setFont(QFont("Sans", 15 if hovered else 13, QFont.Bold))
             p.drawText(QRectF(lx - 50, ly - 14, 100, 28), Qt.AlignCenter, fmt)
         p.setBrush(CENTER)
-        p.setPen(QColor("#ff7a1a"))
+        p.setPen(QColor("#d92323"))
         ri = QRectF(center.x() - inner, center.y() - inner, inner * 2, inner * 2)
         p.drawEllipse(ri)
         p.setPen(TEXT)
