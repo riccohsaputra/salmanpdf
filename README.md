@@ -1,4 +1,4 @@
-# SalmanPDF — Prototipe v0.8.5 (drop-zone + mode global Shift+Drag)
+# SalmanPDF — Prototipe v0.8.6 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.

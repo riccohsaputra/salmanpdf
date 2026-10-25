@@ -362,8 +362,12 @@ class MainWindow(QMainWindow):
         hero_title = QLabel("Semua alat PDF & dokumen dalam satu tempat")
         self._hero_title = hero_title
         hero_title.setAlignment(Qt.AlignCenter)
+        # Font 32px/800: tinggi label dikunci + padding vertikal supaya
+        # puncak huruf tidak kepotong (VBox suka under-report tinggi QLabel)
+        hero_title.setMinimumHeight(56)
         hero_title.setStyleSheet(
-            "font-size:32px;font-weight:800;color:#1f2430")
+            "font-size:32px;font-weight:800;color:#1f2430;"
+            "padding:8px 0 4px 0")
         self._hero_sub = None
         hero_sub = QLabel(
             "Gabung, pisah, kompres, konversi, dan edit — semuanya diproses "
@@ -772,7 +776,8 @@ class MainWindow(QMainWindow):
             f"font-size:10.5px;color:{c['sub']}")
         self._ver_lbl.setStyleSheet(f"font-size:11px;color:{c['faint']}")
         self._hero_title.setStyleSheet(
-            f"font-size:32px;font-weight:800;color:{c['title']}")
+            f"font-size:32px;font-weight:800;color:{c['title']};"
+            "padding:8px 0 4px 0")
         if self._hero_sub is not None:
             self._hero_sub.setStyleSheet(
                 f"font-size:14.5px;color:{c['sub']}")
