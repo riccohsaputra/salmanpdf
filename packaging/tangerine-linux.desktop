@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Tangerine Linux
-Comment=Konversi file lokal: drop-zone + radial wheel
-Exec=tangerine-linux
-Icon=applications-office
-Terminal=false
-Categories=Utility;Office;
