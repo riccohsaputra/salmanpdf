@@ -482,7 +482,9 @@ class MainWindow(QMainWindow):
         credit = QLabel("created by Ricco Abu Salman")
         self._credit = credit
         credit.setAlignment(Qt.AlignCenter)
-        credit.setStyleSheet("font-size:11px;color:#9aa0a8")
+        credit.setStyleSheet(
+            "font-size:13.5px;font-weight:700;color:#26221f;"
+            "padding:6px 0 2px 0")
         body.addWidget(credit)
         inner = QWidget()
         inner.setLayout(body)
@@ -776,7 +778,9 @@ class MainWindow(QMainWindow):
                 f"font-size:14.5px;color:{c['sub']}")
         self.info.setStyleSheet(f"font-size:12px;color:{c['status']}")
         self.status.setStyleSheet(f"font-size:12px;color:{c['status']}")
-        self._credit.setStyleSheet(f"font-size:11px;color:{c['faint']}")
+        self._credit.setStyleSheet(
+            f"font-size:13.5px;font-weight:700;color:{c['text']};"
+            "padding:6px 0 2px 0")
         self._pill_on, self._pill_off = self._pill_styles()
         self._style_pills()
         for card in self._cards:
