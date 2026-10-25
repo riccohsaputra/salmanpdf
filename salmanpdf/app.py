@@ -184,7 +184,7 @@ class _HomePage(QWidget):
     digambar DI BELAKANG konten (tidak pernah menimpa teks)."""
 
     def paintEvent(self, event):  # noqa: N802
-        from PySide6.QtGui import QPainter
+        from PySide6.QtGui import QColor, QPainter
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setPen(Qt.PenStyle.NoPen)
