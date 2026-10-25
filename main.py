@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tangerine Linux v1 — entry point.
+SalmanPDF v1 — entry point.
 
 GUI :  python3 main.py
 CLI :  python3 main.py --convert FILE FORMAT   (mis. --convert contoh.pdf JPG)
@@ -14,12 +14,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from tangerine.converters import ConversionError, convert_many, formats_for
+from salmanpdf.converters import ConversionError, convert_many, formats_for
 
 
 def cli(argv: list[str]) -> int | None:
     """Return exit code kalau mode CLI, None kalau harus buka GUI."""
-    parser = argparse.ArgumentParser(prog="tangerine-linux")
+    parser = argparse.ArgumentParser(prog="salmanpdf")
     parser.add_argument("--convert", nargs=2, metavar=("FILE", "FORMAT"))
     parser.add_argument("--formats", metavar="FILE")
     args = parser.parse_args(argv)
@@ -43,5 +43,5 @@ if __name__ == "__main__":
     code = cli(sys.argv[1:])
     if code is not None:
         raise SystemExit(code)
-    from tangerine.app import main
+    from salmanpdf.app import main
     raise SystemExit(main())

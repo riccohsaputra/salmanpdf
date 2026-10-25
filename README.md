@@ -1,7 +1,9 @@
-# 🍊 Tangerine Linux — Prototipe v0.4.0 (drop-zone + mode global Shift+Drag)
+# SalmanPDF — Prototipe v0.4.1 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.
+
+> **Dulu bernama Tangerine Linux** — di-rename jadi **SalmanPDF** pada 2026-10-25 (v0.4.1).
 
 Ada DUA mode:
 
@@ -96,7 +98,7 @@ Catatan jujur v1:
 
 ```bash
 sudo apt install python3-venv libegl1 libgl1 libxkbcommon0
-unzip tangerine-linux-v1.zip && cd tangerine-linux
+unzip salmanpdf-v1.zip && cd salmanpdf
 ./run.sh
 ```
 
@@ -107,13 +109,13 @@ Pertama kali `run.sh` membuat `.venv` dan menginstall dependency
 
 ### Jalur GitHub (utama, kayak KYAI)
 
-Repo: `github.com/riccohsaputra/tangerine-linux` (private).
+Repo: `github.com/riccohsaputra/salmanpdf` (private).
 
 Install cara clone (sekali saja):
 
 ```bash
-git clone https://github.com/riccohsaputra/tangerine-linux.git
-cd tangerine-linux
+git clone https://github.com/riccohsaputra/salmanpdf.git
+cd salmanpdf
 chmod +x run.sh update.sh build-deb.sh   # wajib sekali: file dari GitHub kehilangan bit executable
 ./run.sh
 ```
@@ -133,7 +135,7 @@ Update setelah itu cukup satu perintah dari folder clone:
 Update dikirim sebagai file `.deb` / `.zip` versi baru — install menimpa
 yang lama, tidak perlu uninstall:
 
-- **Dari .deb:** `sudo dpkg -i tangerine-linux_<versi>_all.deb`
+- **Dari .deb:** `sudo dpkg -i salmanpdf_<versi>_all.deb`
   venv lama dipakai ulang, dependency otomatis di-sync ulang dari
   `requirements.txt` versi baru (postinst).
 - **Dari .zip:** ekstrak menimpa folder lama (folder `.venv` jangan dihapus),
@@ -161,7 +163,7 @@ apa pun. Versi yang sedang jalan terlihat di judul jendela app.
 
 ```
 main.py               entry point (GUI + CLI)
-tangerine/
+salmanpdf/
   converters.py       mesin konversi + tabel routing wheel
   imaging.py          crop + add background/shadow (murni Pillow, ter-test)
   editor.py           dialog editor gambar (preview live + slider)

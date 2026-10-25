@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pymupdf
 
-from tangerine.converters import convert, detect_kind, formats_for, sniff_text
+from salmanpdf.converters import convert, detect_kind, formats_for, sniff_text
 
 
 def _w(tmp_path, name, data, binary=False):

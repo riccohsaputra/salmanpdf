@@ -1,0 +1,3 @@
+#!/bin/sh
+# Launcher SalmanPDF (terinstall via .deb)
+exec /opt/salmanpdf/.venv/bin/python /opt/salmanpdf/main.py "$@"

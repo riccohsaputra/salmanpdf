@@ -8,7 +8,7 @@ import pymupdf
 import pytest
 from PIL import Image
 
-from tangerine.converters import (
+from salmanpdf.converters import (
     ConversionError, convert, convert_many, detect_kind, formats_for,
     unique_output,
 )
@@ -17,7 +17,7 @@ from tangerine.converters import (
 @pytest.fixture()
 def sample_pdf(tmp_path) -> Path:
     doc = pymupdf.open()
-    for txt in ("Halo Tangerine halaman satu", "Halaman dua isi lain"):
+    for txt in ("Halo SalmanPDF halaman satu", "Halaman dua isi lain"):
         page = doc.new_page(width=595, height=842)
         page.insert_text((72, 72), txt, fontsize=14)
     p = tmp_path / "contoh.pdf"
@@ -58,7 +58,7 @@ def test_pdf_to_jpg_multipage(sample_pdf):
 
 def test_pdf_to_txt(sample_pdf):
     (out,) = convert(sample_pdf, "TXT")
-    assert "Halo Tangerine" in out.read_text(encoding="utf-8")
+    assert "Halo SalmanPDF" in out.read_text(encoding="utf-8")
 
 
 def test_image_to_pdf_and_jpg(sample_png):

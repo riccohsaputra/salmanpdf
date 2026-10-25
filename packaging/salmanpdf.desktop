@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=SalmanPDF
+Comment=Konversi file lokal: drop-zone + radial wheel
+Exec=salmanpdf
+Icon=applications-office
+Terminal=false
+Categories=Utility;Office;

@@ -9,10 +9,10 @@ import pymupdf
 import pytest
 from PIL import Image
 
-from tangerine.converters import (
+from salmanpdf.converters import (
     ConversionError, convert, convert_many, detect_kind, formats_for,
 )
-from tangerine import pdfedit
+from salmanpdf import pdfedit
 
 
 def _make_pdf(tmp_path, name, pages=1, text="Isi halaman"):
@@ -57,7 +57,7 @@ def test_office_routing(tmp_path):
 def test_office_docx_ke_pdf_dan_txt(tmp_path):
     # Bikin docx asli pakai LibreOffice dari txt
     src_txt = tmp_path / "halo.txt"
-    src_txt.write_text("Halo Office Tangerine", encoding="utf-8")
+    src_txt.write_text("Halo Office SalmanPDF", encoding="utf-8")
     import subprocess
     subprocess.run(["soffice", "--headless", "--convert-to", "docx",
                     "--outdir", str(tmp_path), str(src_txt)],

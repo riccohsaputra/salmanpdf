@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import pytest
 from PIL import Image
 
-from tangerine.imaging import add_background, apply_edits, crop_aspect, crop_sides
+from salmanpdf.imaging import add_background, apply_edits, crop_aspect, crop_sides
 
 
 @pytest.fixture()
