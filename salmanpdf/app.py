@@ -79,26 +79,30 @@ class ToolDropArea(QFrame):
     def __init__(self, noun: str = "file"):
         super().__init__()
         self.setAcceptDrops(True)
-        self.setMinimumHeight(240)
+        # Model iLovePDF: tombol merah BESAR tepat di bawah judul &
+        # deskripsi halaman alat — BUKAN terapung di tengah halaman
+        # (keluhan Ricco 2026-10-25). Area drop kompak, konten mulai
+        # dari atas; sisa halaman kosong di bawahnya.
+        self.setFixedHeight(132)
         self.pick_btn = QPushButton(f"Pilih {noun}")
         self.pick_btn.setStyleSheet(
             "QPushButton{background:#e5322d;color:#ffffff;"
-            "font-size:17px;font-weight:700;border:none;border-radius:10px;"
-            "padding:16px 46px}"
+            "font-size:19px;font-weight:700;border:none;border-radius:10px;"
+            "padding:19px 72px}"
             "QPushButton:hover{background:#c92723;color:#ffffff}")
         self.pick_btn.clicked.connect(self.pickRequested.emit)
         hint = QLabel(f"atau seret {noun} ke sini")
         hint.setAlignment(Qt.AlignCenter)
-        hint.setStyleSheet("font-size:12.5px;color:#7a7f87")
+        hint.setStyleSheet("font-size:13px;color:#7a7f87")
         col = QVBoxLayout(self)
-        col.addStretch(1)
+        col.setContentsMargins(0, 10, 0, 0)
+        col.setSpacing(10)
         row = QHBoxLayout()
         row.addStretch(1)
         row.addWidget(self.pick_btn)
         row.addStretch(1)
         col.addLayout(row)
         col.addWidget(hint)
-        col.addStretch(1)
 
     def dragEnterEvent(self, event):  # noqa: N802
         if event.mimeData().hasUrls():
@@ -507,7 +511,7 @@ class MainWindow(QMainWindow):
         self.tool_area = ToolDropArea()
         self.tool_area.filesDropped.connect(self._tool_accept)
         self.tool_area.pickRequested.connect(self._tool_pick)
-        lay.addWidget(self.tool_area, 1)
+        lay.addWidget(self.tool_area)
         self.tool_files_lbl = QLabel("")
         self.tool_files_lbl.setAlignment(Qt.AlignCenter)
         self.tool_files_lbl.setStyleSheet("font-size:12.5px;color:#23272f")
@@ -530,6 +534,7 @@ class MainWindow(QMainWindow):
         self.tool_status.setWordWrap(True)
         self.tool_status.setStyleSheet("font-size:12px;color:#555b63")
         lay.addWidget(self.tool_status)
+        lay.addStretch(1)
         self._tool_key: str | None = None
         return page
 
