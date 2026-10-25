@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
@@ -126,6 +126,20 @@ C_DARK = dict(page="#1d2025", header_bg="#23262d", header_border="#33373f",
               title="#f1f3f4", text="#e8eaed", sub="#9aa0a8",
               faint="#7a7f87", card_bg="#26292f", card_border="#363b44",
               desc="#9aa0a8", status="#b8bcc2")
+
+
+def _white_variant(pix: QPixmap) -> QPixmap:
+    """Versi putih dari pixmap glyph (alpha sama, warna jadi putih) —
+    untuk mode gelap supaya ikon garis hitam tetap kelihatan."""
+    img = pix.toImage().convertToFormat(QImage.Format.Format_ARGB32)
+    out = QImage(img.size(), QImage.Format.Format_ARGB32)
+    out.fill(0)
+    painter = QPainter(out)
+    painter.fillRect(out.rect(), Qt.GlobalColor.white)
+    painter.setCompositionMode(QPainter.CompositionMode.DestinationIn)
+    painter.drawImage(0, 0, img)
+    painter.end()
+    return QPixmap.fromImage(out)
 
 
 # ---------------------------------------------------------------- kartu alat
@@ -285,6 +299,9 @@ class MainWindow(QMainWindow):
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(20, 10, 20, 10)
         logo = QLabel()
+        self._logo_lbl = logo
+        self._logo_pix: QPixmap | None = None
+        self._logo_white: QPixmap | None = None
         logo.setFixedSize(38, 38)
         logo.setAlignment(Qt.AlignCenter)
         try:
@@ -295,6 +312,7 @@ class MainWindow(QMainWindow):
             from .icon_data import APPICON_PNG_B64
             _pix = QPixmap()
             if _pix.loadFromData(base64.b64decode(APPICON_PNG_B64)):
+                self._logo_pix = _pix
                 logo.setPixmap(_pix.scaled(
                     38, 38, Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation))
@@ -723,6 +741,17 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(DARK_THEME if self._dark else LIGHT_THEME)
+        if self._logo_pix is not None:
+            if self._dark:
+                if self._logo_white is None:
+                    self._logo_white = _white_variant(self._logo_pix)
+                use = self._logo_white
+            else:
+                use = self._logo_pix
+            self._logo_lbl.setPixmap(use.scaled(
+                38, 38, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation))
+            self.setWindowIcon(QIcon(use))
         self.theme_btn.setText("☀️" if self._dark else "🌙")
         self.theme_btn.setStyleSheet(
             f"QPushButton{{background:{c['card_bg']};"
@@ -992,7 +1021,7 @@ class MainWindow(QMainWindow):
 # termasuk dialog editor (menimpa tema gelap bawaan desktop).
 LIGHT_THEME = """
 QMainWindow, QDialog { background: #ffffff; }
-QLabel { color: #26221f; }
+QLabel { color: #26221f; background: transparent; }
 QCheckBox { color: #26221f; }
 QPushButton { background: #ffffff; color: #26221f; border: 1px solid #e3d5d3;
               border-radius: 10px; padding: 8px 12px; }
@@ -1011,7 +1040,7 @@ QProgressBar::chunk { background: #d92323; border-radius: 3px; }
 # Tema gelap — pasangan LIGHT_THEME, diganti lewat switch di header.
 DARK_THEME = """
 QMainWindow, QDialog { background: #1d2025; }
-QLabel { color: #e8eaed; }
+QLabel { color: #e8eaed; background: transparent; }
 QCheckBox { color: #e8eaed; }
 QPushButton { background: #2a2e35; color: #e8eaed; border: 1px solid #3a3f47;
               border-radius: 10px; padding: 8px 12px; }
