@@ -135,10 +135,13 @@ def _white_variant(pix: QPixmap) -> QPixmap:
     out = QImage(img.size(), QImage.Format.Format_ARGB32)
     out.fill(0)
     painter = QPainter(out)
-    painter.fillRect(out.rect(), Qt.GlobalColor.white)
-    painter.setCompositionMode(QPainter.CompositionMode.DestinationIn)
-    painter.drawImage(0, 0, img)
-    painter.end()
+    try:
+        painter.fillRect(out.rect(), Qt.GlobalColor.white)
+        painter.setCompositionMode(
+            QPainter.CompositionMode.CompositionMode_DestinationIn)
+        painter.drawImage(0, 0, img)
+    finally:
+        painter.end()
     return QPixmap.fromImage(out)
 
 
