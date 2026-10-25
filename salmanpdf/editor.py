@@ -224,3 +224,82 @@ class ImageEditorDialog(QDialog):
             out.save(dest, "PNG")
         self.saved_path = dest
         self.accept()
+
+
+class BgRemoveDialog(QDialog):
+    """Hapus background (putih) gambar dengan halus — alat mandiri.
+    Preview di atas papan catur; hasil disimpan PNG transparan di
+    sebelah file asli dengan akhiran -nobg."""
+
+    def __init__(self, src: Path, parent=None):
+        super().__init__(parent)
+        self.src = src
+        self.saved_path: Path | None = None
+        self.setWindowTitle(f"Hapus Background — {src.name}")
+        self.resize(700, 520)
+        with Image.open(src) as im:
+            im.load()
+            self._full = im.convert("RGBA")
+        self._work = self._full.copy()
+        self._work.thumbnail((880, 880))
+
+        self.preview = QLabel()
+        self.preview.setAlignment(Qt.AlignCenter)
+        self.preview.setMinimumSize(320, 320)
+        self.preview.setStyleSheet(
+            "background:#f0f0f0;border:1px solid #ddd;border-radius:8px")
+
+        right = QVBoxLayout()
+        right.addWidget(QLabel("<b>Ambang putih</b>"))
+        self.s_cut = QSlider(Qt.Orientation.Horizontal)
+        self.s_cut.setRange(140, 250)
+        self.s_cut.setValue(205)
+        self.s_cut.valueChanged.connect(self._refresh)
+        right.addWidget(self.s_cut)
+        hint = QLabel(
+            "Geser sampai background hilang bersih tapi objek tetap utuh. "
+            "Ambang kecil = lebih agresif. Paling cocok untuk gambar di "
+            "atas background putih/terang polos (tanda tangan, logo, produk).")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("font-size:11.5px;color:#6b7280")
+        right.addWidget(hint)
+        right.addStretch(1)
+        btn_row = QHBoxLayout()
+        ok = QPushButton("💾 Simpan hasil (PNG transparan)")
+        ok.clicked.connect(self._save)
+        cancel = QPushButton("Batal")
+        cancel.clicked.connect(self.reject)
+        btn_row.addWidget(ok)
+        btn_row.addWidget(cancel)
+        right.addLayout(btn_row)
+
+        root = QHBoxLayout(self)
+        root.addWidget(self.preview, 1)
+        root.addLayout(right, 1)
+        self._refresh()
+
+    def _refresh(self) -> None:
+        from .imgprep import remove_white_background
+        out = remove_white_background(self._work, cutoff=self.s_cut.value())
+        tile = 12
+        pat = Image.new("RGB", (2, 2))
+        pat.putdata([(255, 255, 255), (216, 216, 216),
+                     (216, 216, 216), (255, 255, 255)])
+        block = pat.resize((tile * 2, tile * 2), Image.Resampling.NEAREST)
+        board = Image.new("RGB", out.size, (255, 255, 255))
+        for y in range(0, out.height, tile * 2):
+            for x in range(0, out.width, tile * 2):
+                board.paste(block, (x, y))
+        board.paste(out, (0, 0), out)
+        pix = _to_pixmap(board)
+        self.preview.setPixmap(pix.scaled(
+            500, 500, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation))
+
+    def _save(self) -> None:
+        from .imgprep import remove_white_background
+        out = remove_white_background(self._full, cutoff=self.s_cut.value())
+        dest = unique_output(self.src, "png", "-nobg")
+        out.save(dest, "PNG")
+        self.saved_path = dest
+        self.accept()

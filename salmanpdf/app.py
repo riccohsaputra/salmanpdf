@@ -35,7 +35,7 @@ FILE_FILTER = (
     "Semua file (*)")
 
 from .converters import ConversionError, convert_many, detect_kind, formats_for
-from .editor import ImageEditorDialog
+from .editor import BgRemoveDialog, ImageEditorDialog
 from .icons import tool_icon
 from .overlay import WheelOverlay
 from .pdf_editor import PdfEditorDialog
@@ -358,6 +358,10 @@ class MainWindow(QMainWindow):
             "crop", "Crop & Add BG", "Potong gambar + beri background & shadow",
             "edit")
         self.card_crop.clicked.connect(lambda: self.open_tool("crop"))
+        self.card_removebg = ToolCard(
+            "removebg", "Hapus Background",
+            "Hilangkan background putih gambar jadi transparan", "edit")
+        self.card_removebg.clicked.connect(lambda: self.open_tool("removebg"))
         self.card_global = ToolCard(
             "global", "Mode Global", "Shift + seret file di Nemo, wheel muncul",
             "lainnya")
@@ -365,7 +369,8 @@ class MainWindow(QMainWindow):
 
         self._cards = [self.card_gabung, self.card_pisah, self.card_kompres,
                        self.card_editpdf, self.card_pdfimg, self.card_imgpdf,
-                       self.card_office, self.card_crop, self.card_global]
+                       self.card_office, self.card_crop, self.card_removebg,
+                       self.card_global]
         # Grid RESPONSIF ala iLovePDF: jumlah kolom mengikuti lebar area
         # (jendela kecil 2-3 kolom, maximize sampai 6 kolom). Kartu ukurannya
         # konsisten & rata atas; sisa ruang vertikal jatuh ke bawah grid.
@@ -491,6 +496,13 @@ class MainWindow(QMainWindow):
                  "dengan mengubahnya menjadi PDF.",
             kinds={"word", "slides", "sheet"}, min_files=1,
             action="Konversi ke PDF", fmt="PDF", noun="file Office"),
+        "removebg": dict(
+            title="Hapus Background Gambar",
+            desc="Hilangkan background putih/terang pada gambar menjadi "
+                 "transparan dengan tepi yang halus. Hasil PNG transparan.",
+            kinds={"image"}, min_files=1, max_files=1,
+            action="Buka Penghapus Background", run="remove_bg",
+            noun="gambar"),
         "crop": dict(
             title="Crop & Add BG",
             desc="Potong sisi gambar, lalu beri background, sudut "
@@ -611,6 +623,8 @@ class MainWindow(QMainWindow):
             self.on_pdf_edit()
         elif cfg.get("run") == "edit_image":
             self.on_edit()
+        elif cfg.get("run") == "remove_bg":
+            self.on_remove_bg()
         else:
             self.on_format(cfg["fmt"])
 
@@ -763,6 +777,18 @@ class MainWindow(QMainWindow):
         dlg = ImageEditorDialog(self._files[0], self)
         if dlg.exec() and dlg.saved_path is not None:
             msg = (f"✅ Hasil edit tersimpan: {dlg.saved_path.name} "
+                   f"(di sebelah {self._files[0].name})")
+            self.status.setText(msg)
+            self.tool_status.setText(msg)
+            self._last_folder = dlg.saved_path.parent
+            self.open_btn.show()
+
+    def on_remove_bg(self) -> None:
+        if len(self._files) != 1 or detect_kind(self._files[0]) != "image":
+            return
+        dlg = BgRemoveDialog(self._files[0], self)
+        if dlg.exec() and dlg.saved_path is not None:
+            msg = (f"✅ Background terhapus: {dlg.saved_path.name} "
                    f"(di sebelah {self._files[0].name})")
             self.status.setText(msg)
             self.tool_status.setText(msg)

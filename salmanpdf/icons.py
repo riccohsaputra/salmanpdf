@@ -137,10 +137,36 @@ def _draw_global(p: QPainter):
     p.setBrush(Qt.BrushStyle.NoBrush)
 
 
+def _star(p: QPainter, cx, cy, r_out, r_in=0.38):
+    pts = []
+    import math
+    for i in range(8):
+        ang = math.pi / 2 + i * math.pi / 4
+        r = r_out if i % 2 == 0 else r_out * r_in
+        pts.append(QPointF(cx + r * math.cos(ang), cy - r * math.sin(ang)))
+    p.setBrush(_INK[0])
+    p.drawPolygon(QPolygonF(pts))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+
+
+def _draw_removebg(p: QPainter):
+    pen = _pen(2.6)
+    pen.setStyle(Qt.PenStyle.DashLine)
+    p.setPen(pen)
+    p.drawRect(QRectF(8, 13, 27, 24))
+    p.setPen(_pen(2.4))
+    p.drawPolyline(QPolygonF([QPointF(11, 34), QPointF(18, 26),
+                              QPointF(22, 30), QPointF(26, 27),
+                              QPointF(32, 34)]))
+    _star(p, 39, 13, 6.5)
+    _star(p, 43, 25, 4)
+
+
 _DRAWERS = {
     "gabung": _draw_gabung, "pisah": _draw_pisah, "kompres": _draw_kompres,
     "edit": _draw_edit, "pdfimg": _draw_pdfimg, "imgpdf": _draw_imgpdf,
     "office": _draw_office, "crop": _draw_crop, "global": _draw_global,
+    "removebg": _draw_removebg,
 }
 
 
@@ -158,6 +184,7 @@ _TILE_STYLE = {
     "imgpdf": ("#d9a514", True),    # emas JPG to PDF
     "office": ("#2f6db3", False),   # biru dokumen Office
     "crop": ("#5b8c5a", False),     # hijau zaitun Crop & BG (alat khas SalmanPDF)
+    "removebg": ("#c2185b", False),  # magenta Hapus Background
     "global": ("#455a64", False),   # abu baja Mode Global (alat khas SalmanPDF)
 }
 
