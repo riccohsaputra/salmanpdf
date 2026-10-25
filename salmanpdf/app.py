@@ -21,7 +21,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
-    QApplication, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
+    QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
     QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
@@ -178,25 +178,6 @@ class ToolCard(QFrame):
         self.desc_lbl.setText(desc if desc is not None else self._desc)
 
 
-class _HomePage(QWidget):
-    """Halaman utama dengan dekorasi blob pink pucat ala iLovePDF:
-    lingkaran lembut menyembul dari pojok kanan-atas & kiri-bawah,
-    digambar DI BELAKANG konten (tidak pernah menimpa teks)."""
-
-    def paintEvent(self, event):  # noqa: N802
-        from PySide6.QtGui import QColor, QPainter
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(255, 205, 216, 70))
-        w, h = self.width(), self.height()
-        p.drawEllipse(w - 190, -150, 380, 380)
-        p.setBrush(QColor(255, 205, 216, 45))
-        p.drawEllipse(-140, h - 190, 340, 340)
-        p.end()
-        super().paintEvent(event)
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -220,6 +201,19 @@ class MainWindow(QMainWindow):
 
         self.wheel = WheelWidget()
         self.wheel.formatSelected.connect(self.on_format)
+        # Wheel TIDAK lagi dipajang permanen di halaman utama (permintaan
+        # Ricco 2026-10-25: placeholder "Seret file dulu ya" dihilangkan).
+        # Ia tinggal di dialog Konversi Cepat yang muncul saat file dipilih
+        # lewat tombol "Pilih File".
+        self._wheel_dialog = QDialog(self)
+        self._wheel_dialog.setWindowTitle("Konversi Cepat — SalmanPDF")
+        wd_lay = QVBoxLayout(self._wheel_dialog)
+        wd_lay.addWidget(self.wheel)
+        wd_hint = QLabel("Klik format tujuan untuk langsung konversi.")
+        wd_hint.setAlignment(Qt.AlignCenter)
+        wd_hint.setStyleSheet("font-size:11.5px;color:#6b7280")
+        wd_lay.addWidget(wd_hint)
+        self._wheel_dialog.resize(336, 380)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)  # indeterminate
@@ -380,36 +374,20 @@ class MainWindow(QMainWindow):
         grid = grid_wrap
         self._relayout_grid()
 
-        # ================= Sidebar kanan: wheel + status =================
-        wheel_box = QFrame()
-        wheel_box.setObjectName("wheelBox")
-        wheel_box.setStyleSheet(
-            "#wheelBox{background:#ffffff;border:1px solid #e7e1dc;"
-            "border-radius:14px}")
-        # Fleksibel mengikuti tinggi sidebar, dibatasi supaya wheel
-        # tidak jadi kartu raksasa kurus saat maximize.
-        wheel_box.setMinimumSize(248, 248)
-        wheel_box.setMaximumHeight(380)
-        wheel_box.setSizePolicy(QSizePolicy.Policy.Expanding,
-                                QSizePolicy.Policy.Expanding)
-        wb_lay = QVBoxLayout(wheel_box)
-        wb_lay.setContentsMargins(8, 8, 8, 8)
-        wb_lay.addWidget(self.wheel)
-
-        side_col = QVBoxLayout()
-        side_col.addWidget(wheel_box)
-        side_col.addWidget(self.info)
-        side_col.addWidget(self.status, 1)
+        # ============ Strip status di bawah grid (tanpa sidebar) =======
+        strip = QVBoxLayout()
+        strip.setSpacing(4)
+        strip.addWidget(self.info)
+        strip.addWidget(self.status)
         prog_row = QHBoxLayout()
         prog_row.addWidget(self.progress)
         prog_row.addStretch(1)
         prog_row.addWidget(self.open_btn)
-        side_col.addLayout(prog_row)
+        strip.addLayout(prog_row)
 
         content_row = QHBoxLayout()
         content_row.setSpacing(16)
         content_row.addWidget(self.grid_container, 1)
-        content_row.addLayout(side_col)
 
         body = QVBoxLayout()
         body.setContentsMargins(26, 16, 26, 14)
@@ -418,6 +396,7 @@ class MainWindow(QMainWindow):
         body.addWidget(hero_sub, 0, Qt.AlignmentFlag.AlignHCenter)
         body.addLayout(pills_row)
         body.addLayout(content_row, 1)
+        body.addLayout(strip)
         inner = QWidget()
         inner.setLayout(body)
         home_outer = QHBoxLayout()
@@ -425,7 +404,7 @@ class MainWindow(QMainWindow):
         home_outer.addStretch(1)
         home_outer.addWidget(inner)
         home_outer.addStretch(1)
-        home_page = _HomePage()
+        home_page = QWidget()
         home_page.setLayout(home_outer)
 
         self._stack = QStackedWidget()
@@ -438,7 +417,7 @@ class MainWindow(QMainWindow):
         home_scroll.setFrameShape(QFrame.Shape.NoFrame)
         home_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        home_scroll.setStyleSheet("QScrollArea{background:#f2f4f8}")
+        home_scroll.setStyleSheet("QScrollArea{background:#ffffff}")
         home_scroll.setWidget(home_page)
         self._stack.addWidget(home_scroll)
         self._stack.addWidget(self._build_tool_page())
@@ -652,8 +631,8 @@ class MainWindow(QMainWindow):
         Lebar jendela dipakai (bukan lebar kontainer) karena lebar
         kontainer belum final saat resizeEvent beruntun — v0.6.4 sempat
         salah hitung jadi 2 kolom di jendela 1150px."""
-        avail = self.width() - 340  # sidebar 248 + spacing + margin body
-        cols = max(2, min(6, avail // 270))
+        avail = self.width() - 56  # margin body kiri-kanan
+        cols = max(2, min(6, avail // 280))
         vis = [c for c in self._cards
                if self._filter is None or c.category == self._filter]
         sig = (cols, tuple(id(c) for c in vis))
@@ -704,9 +683,11 @@ class MainWindow(QMainWindow):
         if len(supported) > 3:
             names += f", +{len(supported) - 3} lagi"
         self.info.setText(f"📄 {len(supported)} file {kind}: {names}\n"
-                          "Klik format di wheel (kiri bawah) atau kartu alatnya.")
+                          "Klik format di jendela Konversi Cepat, atau buka kartu alatnya.")
         center = supported[0].name if len(supported) == 1 else f"{len(supported)} file"
         self.wheel.set_wheel(order, center)
+        self._wheel_dialog.show()
+        self._wheel_dialog.raise_()
         msg = "Siap. Semua konversi lokal, hasil disimpan di sebelah file asli."
         if skipped:
             msg += f" (Dilewati, tak didukung: {', '.join(skipped)})"
@@ -846,7 +827,7 @@ class MainWindow(QMainWindow):
 # Tema terang "frosted glass" ala Tangerine asli — berlaku app-wide,
 # termasuk dialog editor (menimpa tema gelap bawaan desktop).
 LIGHT_THEME = """
-QMainWindow, QDialog { background: #f2f4f8; }
+QMainWindow, QDialog { background: #ffffff; }
 QLabel { color: #26221f; }
 QCheckBox { color: #26221f; }
 QPushButton { background: #ffffff; color: #26221f; border: 1px solid #e3d5d3;
