@@ -250,12 +250,27 @@ class MainWindow(QMainWindow):
             "border-bottom:1px solid #e2e6ee}")
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(20, 10, 20, 10)
-        logo = QLabel("S")
-        logo.setFixedSize(36, 36)
+        logo = QLabel()
+        logo.setFixedSize(38, 38)
         logo.setAlignment(Qt.AlignCenter)
-        logo.setStyleSheet(
-            "background:#d92323;color:#ffffff;font-size:18px;"
-            "font-weight:800;border-radius:9px")
+        try:
+            import base64
+
+            from PySide6.QtGui import QPixmap
+
+            from .icon_data import APPICON_PNG_B64
+            _pix = QPixmap()
+            if _pix.loadFromData(base64.b64decode(APPICON_PNG_B64)):
+                logo.setPixmap(_pix.scaled(
+                    38, 38, Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation))
+            else:
+                raise ValueError("ikon gagal dibaca")
+        except Exception:
+            logo.setText("S")
+            logo.setStyleSheet(
+                "background:#d92323;color:#ffffff;font-size:18px;"
+                "font-weight:800;border-radius:9px")
         h_lay.addWidget(logo)
         brand = QVBoxLayout()
         brand.setSpacing(0)
