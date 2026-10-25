@@ -23,7 +23,7 @@ from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
-    QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
+    QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 FILE_FILTER = (
@@ -115,10 +115,10 @@ class ToolDropArea(QFrame):
 # PENTING: selector WAJIB ter-scope ke #toolCard. QLabel adalah subclass
 # QFrame di Qt — selector "QFrame{...}" polos MENULAR ke semua label anak
 # (kejadian v0.6.0: judul & deskripsi kartu ikut kena border).
-_CARD_BASE = ("#toolCard{background:#ffffff;border:1px solid #e7e1dc;"
-              "border-radius:12px}")
+_CARD_BASE = ("#toolCard{background:#ffffff;border:1px solid #e2e6ee;"
+              "border-radius:16px}")
 _CARD_HOVER = ("#toolCard{background:#ffffff;border:1px solid #d92323;"
-               "border-radius:12px}")
+               "border-radius:16px}")
 
 
 class ToolCard(QFrame):
@@ -138,7 +138,7 @@ class ToolCard(QFrame):
         # Ukuran konsisten ala iLovePDF: lebar fleksibel mengikuti kolom
         # grid responsif, tinggi tetap. Yang menyesuaikan jumlah KOLOM,
         # bukan ukuran kartu (kartu raksasa meregang = terlihat kosong).
-        self.setFixedHeight(150)
+        self.setFixedHeight(214)
         self.setMinimumWidth(225)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Fixed)
@@ -148,12 +148,12 @@ class ToolCard(QFrame):
         self.icon_lbl.setPixmap(tool_icon(icon, 56))
         self.title_lbl = QLabel(title)
         self.title_lbl.setStyleSheet(
-            "font-size:14px;font-weight:700;color:#23272f")
+            "font-size:16px;font-weight:700;color:#1f2430")
         self.desc_lbl = QLabel(desc)
         self.desc_lbl.setWordWrap(True)
-        self.desc_lbl.setStyleSheet("font-size:11px;color:#7a7f87")
+        self.desc_lbl.setStyleSheet("font-size:12.5px;color:#6b7280")
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(14, 12, 14, 10)
+        lay.setContentsMargins(20, 18, 20, 14)
         lay.setSpacing(6)
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.title_lbl)
@@ -178,12 +178,39 @@ class ToolCard(QFrame):
         self.desc_lbl.setText(desc if desc is not None else self._desc)
 
 
+class _HomePage(QWidget):
+    """Halaman utama dengan dekorasi blob pink pucat ala iLovePDF:
+    lingkaran lembut menyembul dari pojok kanan-atas & kiri-bawah,
+    digambar DI BELAKANG konten (tidak pernah menimpa teks)."""
+
+    def paintEvent(self, event):  # noqa: N802
+        from PySide6.QtGui import QPainter
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(255, 205, 216, 70))
+        w, h = self.width(), self.height()
+        p.drawEllipse(w - 190, -150, 380, 380)
+        p.setBrush(QColor(255, 205, 216, 45))
+        p.drawEllipse(-140, h - 190, 340, 340)
+        p.end()
+        super().paintEvent(event)
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         from . import __version__
         self.setWindowTitle(f"SalmanPDF 📄 — v{__version__}")
         self.resize(1120, 740)
+        # Ukuran minimum waras + hint tombol maximize EKSPLISIT: jendela
+        # harus selalu bisa di-minimize/maximize/close normal.
+        self.setMinimumSize(880, 580)
+        self.setWindowFlags(
+            Qt.WindowType.Window
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+            | Qt.WindowType.WindowCloseButtonHint)
         self._files: list[Path] = []
         self._worker: ConvertWorker | None = None
 
@@ -221,7 +248,7 @@ class MainWindow(QMainWindow):
         header.setObjectName("appHeader")
         header.setStyleSheet(
             "#appHeader{background:#ffffff;"
-            "border-bottom:1px solid #e7e1dc}")
+            "border-bottom:1px solid #e2e6ee}")
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(20, 10, 20, 10)
         logo = QLabel("S")
@@ -241,6 +268,20 @@ class MainWindow(QMainWindow):
         brand.addWidget(brand_name)
         brand.addWidget(brand_tag)
         h_lay.addLayout(brand)
+        h_lay.addSpacing(34)
+        for nav_label, nav_key in (("GABUNG PDF", "gabung"),
+                                   ("PISAH PDF", "pisah"),
+                                   ("KOMPRES PDF", "kompres")):
+            nav_btn = QPushButton(nav_label)
+            nav_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            nav_btn.setStyleSheet(
+                "QPushButton{background:transparent;border:none;"
+                "font-size:11.5px;font-weight:700;color:#3c4043;"
+                "padding:6px 10px}"
+                "QPushButton:hover{color:#d92323}")
+            nav_btn.clicked.connect(
+                lambda _=False, k=nav_key: self.open_tool(k))
+            h_lay.addWidget(nav_btn)
         h_lay.addStretch(1)
         ver_lbl = QLabel(f"v{__version__}")
         ver_lbl.setStyleSheet("font-size:11px;color:#9aa0a8")
@@ -257,12 +298,14 @@ class MainWindow(QMainWindow):
         hero_title = QLabel("Semua alat PDF & dokumen dalam satu tempat")
         hero_title.setAlignment(Qt.AlignCenter)
         hero_title.setStyleSheet(
-            "font-size:25px;font-weight:800;color:#23272f")
+            "font-size:32px;font-weight:800;color:#1f2430")
         hero_sub = QLabel(
             "Gabung, pisah, kompres, konversi, dan edit — semuanya diproses "
             "lokal di laptop kamu, tanpa upload.")
         hero_sub.setAlignment(Qt.AlignCenter)
-        hero_sub.setStyleSheet("font-size:12.5px;color:#7a7f87")
+        hero_sub.setWordWrap(True)
+        hero_sub.setMaximumWidth(920)
+        hero_sub.setStyleSheet("font-size:14.5px;color:#6b7280")
 
         # ================= Filter pills (ala iLovePDF) =================
         self._pills: list[tuple[QPushButton, str | None]] = []
@@ -323,7 +366,7 @@ class MainWindow(QMainWindow):
         # (jendela kecil 2-3 kolom, maximize sampai 6 kolom). Kartu ukurannya
         # konsisten & rata atas; sisa ruang vertikal jatuh ke bawah grid.
         self.grid = QGridLayout()
-        self.grid.setSpacing(12)
+        self.grid.setSpacing(16)
         for c in range(6):
             self.grid.setColumnStretch(c, 1)
         self._grid_sig: tuple | None = None
@@ -372,7 +415,7 @@ class MainWindow(QMainWindow):
         body.setContentsMargins(26, 16, 26, 14)
         body.setSpacing(11)
         body.addWidget(hero_title)
-        body.addWidget(hero_sub)
+        body.addWidget(hero_sub, 0, Qt.AlignmentFlag.AlignHCenter)
         body.addLayout(pills_row)
         body.addLayout(content_row, 1)
         inner = QWidget()
@@ -382,11 +425,22 @@ class MainWindow(QMainWindow):
         home_outer.addStretch(1)
         home_outer.addWidget(inner)
         home_outer.addStretch(1)
-        home_page = QWidget()
+        home_page = _HomePage()
         home_page.setLayout(home_outer)
 
         self._stack = QStackedWidget()
-        self._stack.addWidget(home_page)
+        # Halaman utama dibungkus SCROLL AREA persis halaman web: konten
+        # yang lebih tinggi dari jendela di-scroll, BUKAN memaksa jendela
+        # jadi raksasa (v0.6.4: grid 2 kolom -> min height > layar ->
+        # jendela meluber & tombol maximize hilang di tema Cinnamon-nya).
+        home_scroll = QScrollArea()
+        home_scroll.setWidgetResizable(True)
+        home_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        home_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        home_scroll.setStyleSheet("QScrollArea{background:#f2f4f8}")
+        home_scroll.setWidget(home_page)
+        self._stack.addWidget(home_scroll)
         self._stack.addWidget(self._build_tool_page())
 
         layout = QVBoxLayout()
@@ -571,12 +625,12 @@ class MainWindow(QMainWindow):
             self.on_files([Path(p) for p in paths])
 
     # ------------------------------------------------- filter pills
-    _PILL_ON = ("QPushButton{background:#23272f;color:#ffffff;font-weight:600;"
-                "border:1px solid #23272f;border-radius:14px;"
-                "padding:5px 14px}")
-    _PILL_OFF = ("QPushButton{background:#ffffff;color:#23272f;"
-                 "border:1px solid #ddd6d0;border-radius:14px;"
-                 "padding:5px 14px} QPushButton:hover{border-color:#d92323;"
+    _PILL_ON = ("QPushButton{background:#1f2430;color:#ffffff;font-weight:600;"
+                "font-size:13px;border:1px solid #1f2430;border-radius:18px;"
+                "padding:8px 17px}")
+    _PILL_OFF = ("QPushButton{background:#ffffff;color:#3c4043;"
+                 "font-size:13px;border:1px solid #d9dee7;border-radius:18px;"
+                 "padding:8px 17px} QPushButton:hover{border-color:#d92323;"
                  "color:#d92323}")
 
     def _style_pills(self) -> None:
@@ -594,11 +648,12 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------- grid responsif
     def _relayout_grid(self) -> None:
-        """Susun ulang kartu mengikuti lebar area grid & filter aktif."""
-        w = self.grid_container.width()
-        if w < 100:
-            w = 880  # perkiraan sebelum jendela tampil (3 kolom)
-        cols = max(2, min(6, w // 270))
+        """Susun ulang kartu mengikuti lebar JENDELA & filter aktif.
+        Lebar jendela dipakai (bukan lebar kontainer) karena lebar
+        kontainer belum final saat resizeEvent beruntun — v0.6.4 sempat
+        salah hitung jadi 2 kolom di jendela 1150px."""
+        avail = self.width() - 340  # sidebar 248 + spacing + margin body
+        cols = max(2, min(6, avail // 270))
         vis = [c for c in self._cards
                if self._filter is None or c.category == self._filter]
         sig = (cols, tuple(id(c) for c in vis))
@@ -791,7 +846,7 @@ class MainWindow(QMainWindow):
 # Tema terang "frosted glass" ala Tangerine asli — berlaku app-wide,
 # termasuk dialog editor (menimpa tema gelap bawaan desktop).
 LIGHT_THEME = """
-QMainWindow, QDialog { background: #f3f1ee; }
+QMainWindow, QDialog { background: #f2f4f8; }
 QLabel { color: #26221f; }
 QCheckBox { color: #26221f; }
 QPushButton { background: #ffffff; color: #26221f; border: 1px solid #e3d5d3;
