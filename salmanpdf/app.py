@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 FILE_FILTER = (
-    "Didukung (*.pdf *.jpg *.jpeg *.png *.webp *.bmp *.tiff "
+    "Didukung (*.pdf *.jpg *.jpeg *.png *.webp *.bmp *.gif *.tif *.tiff "
     "*.docx *.doc *.odt *.rtf *.pptx *.ppt *.odp "
     "*.xlsx *.xls *.ods "
     "*.txt *.text *.md *.log *.csv *.ini *.cfg *.sh *.py *.json);;"
