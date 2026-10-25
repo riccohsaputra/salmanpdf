@@ -3,6 +3,6 @@ Type=Application
 Name=SalmanPDF
 Comment=Konversi file lokal: drop-zone + radial wheel
 Exec=salmanpdf
-Icon=applications-office
+Icon=salmanpdf
 Terminal=false
 Categories=Utility;Office;

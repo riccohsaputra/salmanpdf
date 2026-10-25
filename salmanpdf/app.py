@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
@@ -846,6 +847,17 @@ QRadioButton { color: #26221f; }
 def main() -> int:
     app = QApplication(sys.argv)
     app.setStyleSheet(LIGHT_THEME)
+    try:
+        import base64
+
+        from PySide6.QtGui import QPixmap
+
+        from .icon_data import APPICON_PNG_B64
+        pix = QPixmap()
+        if pix.loadFromData(base64.b64decode(APPICON_PNG_B64)):
+            app.setWindowIcon(QIcon(pix))
+    except Exception:
+        pass  # ikon jendela bonus — jangan gagalkan startup karenanya
     win = MainWindow()
     win.show()
     return app.exec()
