@@ -144,10 +144,30 @@ _DRAWERS = {
 }
 
 
+# Gaya ikon iLovePDF (disesuaikan 2026-10-25 atas permintaan Ricco):
+# kotak membulat SOLID berwarna khas per alat + glyph PUTIH di atasnya.
+# Alat konversi (pdfimg/imgpdf) dapat ubin belakang pucat yang bergeser
+# diagonal — motif khas ikon konversi iLovePDF.
+# name -> (warna ubin, pakai ubin belakang?)
+_TILE_STYLE = {
+    "gabung": ("#f4631e", False),   # oranye Merge
+    "pisah": ("#f4631e", False),    # oranye Split
+    "kompres": ("#7cb342", False),  # hijau Compress
+    "edit": ("#9b51b0", False),     # ungu Edit
+    "pdfimg": ("#d9a514", True),    # emas PDF to JPG
+    "imgpdf": ("#d9a514", True),    # emas JPG to PDF
+    "office": ("#2f6db3", False),   # biru dokumen Office
+    "crop": ("#5b8c5a", False),     # hijau zaitun Crop & BG (alat khas SalmanPDF)
+    "global": ("#455a64", False),   # abu baja Mode Global (alat khas SalmanPDF)
+}
+
+
 def tool_icon(name: str, size: int = 56, active: bool = False) -> QPixmap:
-    """Pixmap ikon alat: chip membulat + glyph di tengah.
-    active=True -> chip merah penuh, glyph putih (mis. Mode Global ON)."""
-    _INK[0] = WHITE if active else RED
+    """Pixmap ikon alat gaya iLovePDF: ubin solid berwarna + glyph putih.
+    active=True (Mode Global ON) -> ubin berubah merah brand SalmanPDF."""
+    bg_hex, back = _TILE_STYLE[name]
+    bg = RED if active else QColor(bg_hex)
+    _INK[0] = WHITE
     scale = 2  # supersampling biar tajam
     px = QPixmap(size * scale, size * scale)
     px.setDevicePixelRatio(scale)
@@ -155,9 +175,14 @@ def tool_icon(name: str, size: int = 56, active: bool = False) -> QPixmap:
     p = QPainter(px)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(RED if active else CHIP_BG)
-    p.drawRoundedRect(QRectF(0, 0, size, size), 14, 14)
-    # Peta grid 48 -> area glyph di dalam chip (padding 17%)
+    inset = 5 if back else 0
+    if back:
+        p.setBrush(bg.lighter(155))
+        p.drawRoundedRect(QRectF(0, 0, size - inset, size - inset), 13, 13)
+    p.setBrush(bg)
+    p.drawRoundedRect(QRectF(inset, inset, size - inset, size - inset),
+                      13, 13)
+    # Peta grid 48 -> area glyph di dalam ubin (padding 17%)
     f = size / GRID
     p.translate(size * 0.17, size * 0.17)
     p.scale(f * 0.66, f * 0.66)
