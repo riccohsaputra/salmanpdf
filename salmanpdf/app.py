@@ -135,11 +135,13 @@ class ToolCard(QFrame):
         self._icon_name = icon
         self.setStyleSheet(_CARD_BASE)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Fleksibel: kartu ikut meregang mengisi ruang saat jendela
-        # di-maximize (dulu fixed height -> grid penuh celah kosong).
-        self.setMinimumHeight(self.MIN_HEIGHT)
+        # Ukuran konsisten ala iLovePDF: lebar fleksibel mengikuti kolom
+        # grid responsif, tinggi tetap. Yang menyesuaikan jumlah KOLOM,
+        # bukan ukuran kartu (kartu raksasa meregang = terlihat kosong).
+        self.setFixedHeight(150)
+        self.setMinimumWidth(225)
         self.setSizePolicy(QSizePolicy.Policy.Expanding,
-                           QSizePolicy.Policy.Expanding)
+                           QSizePolicy.Policy.Fixed)
         self._desc = desc
         self.icon_lbl = QLabel()
         self.icon_lbl.setFixedSize(56, 56)
@@ -153,10 +155,6 @@ class ToolCard(QFrame):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 12, 14, 10)
         lay.setSpacing(6)
-        # Konten berkelompok di TENGAH kartu: saat kartu meregang tinggi,
-        # ikon+judul+deskripsi tetap kompak di tengah, bukan tenggelam
-        # di atas dengan ruang kosong besar di bawahnya.
-        lay.addStretch(1)
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.title_lbl)
         lay.addWidget(self.desc_lbl)
@@ -321,10 +319,23 @@ class MainWindow(QMainWindow):
         self._cards = [self.card_gabung, self.card_pisah, self.card_kompres,
                        self.card_editpdf, self.card_pdfimg, self.card_imgpdf,
                        self.card_office, self.card_crop, self.card_global]
-        grid = QGridLayout()
-        grid.setSpacing(12)
-        for i, card in enumerate(self._cards):
-            grid.addWidget(card, i // 3, i % 3)
+        # Grid RESPONSIF ala iLovePDF: jumlah kolom mengikuti lebar area
+        # (jendela kecil 2-3 kolom, maximize sampai 6 kolom). Kartu ukurannya
+        # konsisten & rata atas; sisa ruang vertikal jatuh ke bawah grid.
+        self.grid = QGridLayout()
+        self.grid.setSpacing(12)
+        for c in range(6):
+            self.grid.setColumnStretch(c, 1)
+        self._grid_sig: tuple | None = None
+        self._filter: str | None = None
+        grid_wrap = QVBoxLayout()
+        grid_wrap.setContentsMargins(0, 0, 0, 0)
+        grid_wrap.addLayout(self.grid)
+        grid_wrap.addStretch(1)
+        self.grid_container = QWidget()
+        self.grid_container.setLayout(grid_wrap)
+        grid = grid_wrap
+        self._relayout_grid()
 
         # ================= Sidebar kanan: wheel + status =================
         wheel_box = QFrame()
@@ -354,7 +365,7 @@ class MainWindow(QMainWindow):
 
         content_row = QHBoxLayout()
         content_row.setSpacing(16)
-        content_row.addLayout(grid, 1)
+        content_row.addWidget(self.grid_container, 1)
         content_row.addLayout(side_col)
 
         body = QVBoxLayout()
@@ -365,7 +376,6 @@ class MainWindow(QMainWindow):
         body.addLayout(pills_row)
         body.addLayout(content_row, 1)
         inner = QWidget()
-        inner.setMaximumWidth(1560)
         inner.setLayout(body)
         home_outer = QHBoxLayout()
         home_outer.setContentsMargins(0, 0, 0, 0)
@@ -578,8 +588,37 @@ class MainWindow(QMainWindow):
         for pill, cat in self._pills:
             pill.setChecked(cat == category)
         self._style_pills()
+        self._filter = category
+        self._grid_sig = None
+        self._relayout_grid()
+
+    # ------------------------------------------------- grid responsif
+    def _relayout_grid(self) -> None:
+        """Susun ulang kartu mengikuti lebar area grid & filter aktif."""
+        w = self.grid_container.width()
+        if w < 100:
+            w = 880  # perkiraan sebelum jendela tampil (3 kolom)
+        cols = max(2, min(6, w // 270))
+        vis = [c for c in self._cards
+               if self._filter is None or c.category == self._filter]
+        sig = (cols, tuple(id(c) for c in vis))
+        if sig == self._grid_sig:
+            return
+        self._grid_sig = sig
+        while self.grid.count():
+            self.grid.takeAt(0)
+        in_grid = set()
+        for i, card in enumerate(vis):
+            self.grid.addWidget(card, i // cols, i % cols)
+            card.show()
+            in_grid.add(id(card))
         for card in self._cards:
-            card.setVisible(category is None or card.category == category)
+            if id(card) not in in_grid:
+                card.hide()
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        QTimer.singleShot(0, self._relayout_grid)
 
     # ------------------------------------------------------------- flow
     def on_files(self, files: list[Path]) -> None:
