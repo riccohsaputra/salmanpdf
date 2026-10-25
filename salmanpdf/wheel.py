@@ -15,7 +15,7 @@ import math
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QSizePolicy, QWidget
 
 # Palet "frosted glass" ala Tangerine asli: putih transparan, teks gelap,
 # sektor yang di-hover menyala merah dengan teks putih.
@@ -34,7 +34,14 @@ class WheelWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(380, 380)
+        # JANGAN pakai minimum besar yang kaku: wheel harus menyesuaikan
+        # wadahnya. Dulu minimum 380px sementara kotak sidebar cuma 248px
+        # -> widget meluber keluar kotak, pusat gambar bergeser ke kanan,
+        # teks "Seret file dulu ya" terlihat tidak simetris/terpotong
+        # (dilaporkan Ricco 2026-10-25 di v0.6.1).
+        self.setMinimumSize(180, 180)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,
+                           QSizePolicy.Policy.Expanding)
         self.setMouseTracking(True)
         self._formats: list[str] = []
         self._center_label = "📄"
