@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QSettings, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
@@ -95,6 +95,7 @@ class ToolDropArea(QFrame):
         hint = QLabel(f"atau seret {noun} ke sini")
         hint.setAlignment(Qt.AlignCenter)
         hint.setStyleSheet("font-size:13px;color:#7a7f87")
+        self.hint_lbl = hint
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 10, 0, 0)
         col.setSpacing(10)
@@ -114,6 +115,17 @@ class ToolDropArea(QFrame):
                  if u.isLocalFile()]
         if files:
             self.filesDropped.emit(files)
+
+
+# ---------------------------------------------------------------- tema
+C_LIGHT = dict(page="#ffffff", header_bg="#ffffff", header_border="#e2e6ee",
+               title="#1f2430", text="#26221f", sub="#6b7280",
+               faint="#9aa0a8", card_bg="#ffffff", card_border="#e2e6ee",
+               desc="#6b7280", status="#555b63")
+C_DARK = dict(page="#1d2025", header_bg="#23262d", header_border="#33373f",
+              title="#f1f3f4", text="#e8eaed", sub="#9aa0a8",
+              faint="#7a7f87", card_bg="#26292f", card_border="#363b44",
+              desc="#9aa0a8", status="#b8bcc2")
 
 
 # ---------------------------------------------------------------- kartu alat
@@ -138,6 +150,8 @@ class ToolCard(QFrame):
         self.setObjectName("toolCard")
         self.category = category
         self._icon_name = icon
+        self._ss_base = _CARD_BASE
+        self._ss_hover = _CARD_HOVER
         self.setStyleSheet(_CARD_BASE)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         # Ukuran konsisten ala iLovePDF: lebar fleksibel mengikuti kolom
@@ -166,12 +180,26 @@ class ToolCard(QFrame):
         lay.addStretch(1)
 
     def enterEvent(self, event):  # noqa: N802
-        self.setStyleSheet(_CARD_HOVER)
+        self.setStyleSheet(self._ss_hover)
         super().enterEvent(event)
 
     def leaveEvent(self, event):  # noqa: N802
-        self.setStyleSheet(_CARD_BASE)
+        self.setStyleSheet(self._ss_base)
         super().leaveEvent(event)
+
+    def apply_theme(self, dark: bool) -> None:
+        c = C_DARK if dark else C_LIGHT
+        self._ss_base = (
+            f"#toolCard{{background:{c['card_bg']};"
+            f"border:1px solid {c['card_border']};border-radius:16px}}")
+        self._ss_hover = (
+            f"#toolCard{{background:{c['card_bg']};"
+            "border:1px solid #d92323;border-radius:16px}")
+        self.setStyleSheet(self._ss_base)
+        self.title_lbl.setStyleSheet(
+            f"font-size:16px;font-weight:700;color:{c['title']}")
+        self.desc_lbl.setStyleSheet(
+            f"font-size:12.5px;color:{c['desc']}")
 
     def mousePressEvent(self, event):  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
@@ -199,6 +227,11 @@ class MainWindow(QMainWindow):
             | Qt.WindowType.WindowCloseButtonHint)
         self._files: list[Path] = []
         self._worker: ConvertWorker | None = None
+        # Tema terang/gelap (persisten via QSettings)
+        self._settings = QSettings("SalmanPDF", "SalmanPDF")
+        self._dark = self._settings.value("dark", False, type=bool)
+        self._c = C_DARK if self._dark else C_LIGHT
+        self._pill_on, self._pill_off = self._pill_styles()
 
         self.info = QLabel("Belum ada file.")
         self.info.setWordWrap(True)
@@ -244,6 +277,7 @@ class MainWindow(QMainWindow):
 
         # ================= Header (ala iLovePDF) =================
         header = QFrame()
+        self._header = header
         header.setObjectName("appHeader")
         header.setStyleSheet(
             "#appHeader{background:#ffffff;"
@@ -275,15 +309,24 @@ class MainWindow(QMainWindow):
         brand = QVBoxLayout()
         brand.setSpacing(0)
         brand_name = QLabel("SalmanPDF")
+        self._brand_name = brand_name
         brand_name.setStyleSheet(
             "font-size:17px;font-weight:800;color:#23272f")
         brand_tag = QLabel("Konverter PDF & dokumen — 100% lokal")
+        self._brand_tag = brand_tag
         brand_tag.setStyleSheet("font-size:10.5px;color:#7a7f87")
         brand.addWidget(brand_name)
         brand.addWidget(brand_tag)
         h_lay.addLayout(brand)
         h_lay.addStretch(1)
+        self.theme_btn = QPushButton("🌙")
+        self.theme_btn.setFixedSize(38, 38)
+        self.theme_btn.setToolTip("Ganti mode gelap / terang")
+        self.theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.theme_btn.clicked.connect(self._toggle_theme)
+        h_lay.addWidget(self.theme_btn)
         ver_lbl = QLabel(f"v{__version__}")
+        self._ver_lbl = ver_lbl
         ver_lbl.setStyleSheet("font-size:11px;color:#9aa0a8")
         h_lay.addWidget(ver_lbl)
         pick_btn = QPushButton("Pilih File")
@@ -296,13 +339,16 @@ class MainWindow(QMainWindow):
 
         # ================= Hero =================
         hero_title = QLabel("Semua alat PDF & dokumen dalam satu tempat")
+        self._hero_title = hero_title
         hero_title.setAlignment(Qt.AlignCenter)
         hero_title.setStyleSheet(
             "font-size:32px;font-weight:800;color:#1f2430")
+        self._hero_sub = None
         hero_sub = QLabel(
             "Gabung, pisah, kompres, konversi, dan edit — semuanya diproses "
             "lokal di laptop kamu, tanpa upload.")
         hero_sub.setAlignment(Qt.AlignCenter)
+        self._hero_sub = hero_sub
         hero_sub.setWordWrap(True)
         hero_sub.setMaximumWidth(920)
         # QLabel word-wrap di VBox sering salah hitung tinggi (teks
@@ -413,6 +459,7 @@ class MainWindow(QMainWindow):
         body.addLayout(content_row, 1)
         body.addLayout(strip)
         credit = QLabel("created by Ricco Abu Salman")
+        self._credit = credit
         credit.setAlignment(Qt.AlignCenter)
         credit.setStyleSheet("font-size:11px;color:#9aa0a8")
         body.addWidget(credit)
@@ -432,6 +479,7 @@ class MainWindow(QMainWindow):
         # jadi raksasa (v0.6.4: grid 2 kolom -> min height > layar ->
         # jendela meluber & tombol maximize hilang di tema Cinnamon-nya).
         home_scroll = QScrollArea()
+        self._home_scroll = home_scroll
         home_scroll.setWidgetResizable(True)
         home_scroll.setFrameShape(QFrame.Shape.NoFrame)
         home_scroll.setHorizontalScrollBarPolicy(
@@ -452,6 +500,7 @@ class MainWindow(QMainWindow):
         central = QWidget()
         central.setLayout(layout)
         self.setCentralWidget(central)
+        self._apply_theme()
 
     # ------------------------------------------------- halaman alat (tool page)
     TOOLS = {
@@ -517,6 +566,7 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(26, 14, 26, 14)
         lay.setSpacing(10)
         back_btn = QPushButton("←  Kembali ke semua alat")
+        self._back_btn = back_btn
         back_btn.setStyleSheet(
             "QPushButton{background:transparent;border:none;color:#555b63;"
             "font-size:12.5px;padding:4px 8px;text-align:left}"
@@ -643,10 +693,81 @@ class MainWindow(QMainWindow):
                  "padding:8px 17px} QPushButton:hover{border-color:#d92323;"
                  "color:#d92323}")
 
+    def _pill_styles(self) -> tuple[str, str]:
+        if self._dark:
+            on = ("QPushButton{background:#e8eaed;color:#1d2025;"
+                  "font-weight:600;font-size:13px;border:1px solid #e8eaed;"
+                  "border-radius:18px;padding:8px 17px}")
+            off = ("QPushButton{background:#26292f;color:#e8eaed;"
+                   "font-size:13px;border:1px solid #3a3f47;"
+                   "border-radius:18px;padding:8px 17px}"
+                   "QPushButton:hover{border-color:#ff6b61;color:#ff6b61}")
+        else:
+            on, off = self._PILL_ON, self._PILL_OFF
+        return on, off
+
     def _style_pills(self) -> None:
         for pill, _cat in self._pills:
-            pill.setStyleSheet(self._PILL_ON if pill.isChecked()
-                               else self._PILL_OFF)
+            pill.setStyleSheet(self._pill_on if pill.isChecked()
+                               else self._pill_off)
+
+    # ------------------------------------------------------------- tema
+    def _toggle_theme(self) -> None:
+        self._dark = not self._dark
+        self._settings.setValue("dark", self._dark)
+        self._apply_theme()
+
+    def _apply_theme(self) -> None:
+        c = C_DARK if self._dark else C_LIGHT
+        self._c = c
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(DARK_THEME if self._dark else LIGHT_THEME)
+        self.theme_btn.setText("☀️" if self._dark else "🌙")
+        self.theme_btn.setStyleSheet(
+            f"QPushButton{{background:{c['card_bg']};"
+            f"border:1px solid {c['card_border']};border-radius:10px;"
+            "font-size:16px}"
+            "QPushButton:hover{border-color:#d92323}")
+        self._header.setStyleSheet(
+            f"#appHeader{{background:{c['header_bg']};"
+            f"border-bottom:1px solid {c['header_border']}}}")
+        self._brand_name.setStyleSheet(
+            f"font-size:17px;font-weight:800;color:{c['title']}")
+        self._brand_tag.setStyleSheet(
+            f"font-size:10.5px;color:{c['sub']}")
+        self._ver_lbl.setStyleSheet(f"font-size:11px;color:{c['faint']}")
+        self._hero_title.setStyleSheet(
+            f"font-size:32px;font-weight:800;color:{c['title']}")
+        if self._hero_sub is not None:
+            self._hero_sub.setStyleSheet(
+                f"font-size:14.5px;color:{c['sub']}")
+        self.info.setStyleSheet(f"font-size:12px;color:{c['status']}")
+        self.status.setStyleSheet(f"font-size:12px;color:{c['status']}")
+        self._credit.setStyleSheet(f"font-size:11px;color:{c['faint']}")
+        self._pill_on, self._pill_off = self._pill_styles()
+        self._style_pills()
+        for card in self._cards:
+            card.apply_theme(self._dark)
+        self._home_scroll.setStyleSheet(
+            f"QScrollArea{{background:{c['page']}}}")
+        self._home_scroll.viewport().setStyleSheet(
+            f"background:{c['page']}")
+        self.tool_title.setStyleSheet(
+            f"font-size:29px;font-weight:800;color:{c['title']}")
+        self.tool_desc.setStyleSheet(
+            f"font-size:13px;color:{c['sub']}")
+        self.tool_files_lbl.setStyleSheet(
+            f"font-size:12.5px;color:{c['title']}")
+        self.tool_status.setStyleSheet(
+            f"font-size:12px;color:{c['status']}")
+        self.tool_area.hint_lbl.setStyleSheet(
+            f"font-size:13px;color:{c['sub']}")
+        self._back_btn.setStyleSheet(
+            "QPushButton{background:transparent;border:none;"
+            f"color:{c['status']};font-size:12.5px;padding:4px 8px;"
+            "text-align:left}"
+            "QPushButton:hover{color:#d92323}")
 
     def _filter_cards(self, category: str | None) -> None:
         for pill, cat in self._pills:
@@ -882,6 +1003,28 @@ QComboBox { background: #ffffff; color: #26221f; border: 1px solid #d8d3c8;
 QLineEdit, QSpinBox { background: #ffffff; color: #26221f;
             border: 1px solid #d8d3c8; border-radius: 6px; padding: 4px; }
 QRadioButton { color: #26221f; }
+QProgressBar { background: #e8eaed; border: none; height: 6px;
+               border-radius: 3px; }
+QProgressBar::chunk { background: #d92323; border-radius: 3px; }
+"""
+
+# Tema gelap — pasangan LIGHT_THEME, diganti lewat switch di header.
+DARK_THEME = """
+QMainWindow, QDialog { background: #1d2025; }
+QLabel { color: #e8eaed; }
+QCheckBox { color: #e8eaed; }
+QPushButton { background: #2a2e35; color: #e8eaed; border: 1px solid #3a3f47;
+              border-radius: 10px; padding: 8px 12px; }
+QPushButton:hover { border-color: #ff6b61; color: #ff6b61; }
+QPushButton:disabled { color: #7a7f87; background: #24272d; }
+QComboBox { background: #26292f; color: #e8eaed; border: 1px solid #3a3f47;
+            border-radius: 6px; padding: 4px; }
+QLineEdit, QSpinBox { background: #26292f; color: #e8eaed;
+            border: 1px solid #3a3f47; border-radius: 6px; padding: 4px; }
+QRadioButton { color: #e8eaed; }
+QProgressBar { background: #33373f; border: none; height: 6px;
+               border-radius: 3px; }
+QProgressBar::chunk { background: #d92323; border-radius: 3px; }
 """
 
 
