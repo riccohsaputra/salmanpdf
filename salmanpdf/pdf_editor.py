@@ -7,19 +7,138 @@ menempel -> ulangi seperlunya -> Simpan (-edit.pdf di sebelah aslinya).
 """
 from __future__ import annotations
 
+import io
+import tempfile
 from pathlib import Path
 
 from PIL import Image
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (
-    QColorDialog, QComboBox, QDialog, QFileDialog, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QRadioButton, QSpinBox, QVBoxLayout,
+    QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QHBoxLayout,
+    QLabel, QLineEdit, QPushButton, QRadioButton, QSlider, QSpinBox,
+    QVBoxLayout,
 )
 
+from .imgprep import crop_percent, prepare_image, remove_white_background
 from .pdfedit import apply_edits, list_system_fonts, render_preview
 
 PREVIEW_W = 440
+
+
+class ImagePrepDialog(QDialog):
+    """Siapkan gambar sebelum ditempel ke PDF: crop tepi + hapus
+    background putih dengan halus (untuk tanda tangan/logo/foto).
+    Preview di atas pola papan catur supaya transparansi terlihat."""
+
+    def __init__(self, src: Path, parent=None):
+        super().__init__(parent)
+        self.src = src
+        self.prepared: Path | None = None
+        self.setWindowTitle(f"Siapkan Gambar — {src.name}")
+        self.resize(720, 520)
+        with Image.open(src) as im:
+            im.load()
+            self._full = im.convert("RGBA")
+        self._work = self._full.copy()
+        self._work.thumbnail((880, 880))
+
+        self.preview = QLabel()
+        self.preview.setAlignment(Qt.AlignCenter)
+        self.preview.setMinimumSize(340, 340)
+        self.preview.setStyleSheet(
+            "background:#f0f0f0;border:1px solid #ddd;border-radius:8px")
+
+        def crop_slider(label):
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label))
+            s = QSlider(Qt.Orientation.Horizontal)
+            s.setRange(0, 45)
+            s.setValue(0)
+            val = QLabel("0%")
+            s.valueChanged.connect(
+                lambda v, lb=val: (lb.setText(f"{v}%"), self._refresh()))
+            row.addWidget(s, 1)
+            row.addWidget(val)
+            return row, s
+
+        right = QVBoxLayout()
+        right.addWidget(QLabel("<b>✂️ Crop tepi (%)</b>"))
+        r1, self.s_left = crop_slider("Kiri")
+        r2, self.s_top = crop_slider("Atas")
+        r3, self.s_right = crop_slider("Kanan")
+        r4, self.s_bottom = crop_slider("Bawah")
+        for r in (r1, r2, r3, r4):
+            right.addLayout(r)
+        right.addSpacing(10)
+        self.chk_bg = QCheckBox("Hapus background putih (halus)")
+        self.chk_bg.setChecked(True)
+        self.chk_bg.toggled.connect(self._refresh)
+        right.addWidget(self.chk_bg)
+        bg_row = QHBoxLayout()
+        bg_row.addWidget(QLabel("Ambang putih:"))
+        self.s_cut = QSlider(Qt.Orientation.Horizontal)
+        self.s_cut.setRange(140, 250)
+        self.s_cut.setValue(205)
+        self.s_cut.valueChanged.connect(self._refresh)
+        bg_row.addWidget(self.s_cut, 1)
+        right.addLayout(bg_row)
+        hint = QLabel("Ambang lebih kecil = background lebih bersih, tapi "
+                      "bagian putih di dalam gambar ikut hilang. Cocok "
+                      "untuk tanda tangan & logo di kertas putih.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("font-size:11px;color:#6b7280")
+        right.addWidget(hint)
+        right.addStretch(1)
+        btn_row = QHBoxLayout()
+        ok = QPushButton("✅ Pakai gambar ini")
+        ok.clicked.connect(self._accept)
+        cancel = QPushButton("Batal")
+        cancel.clicked.connect(self.reject)
+        btn_row.addWidget(ok)
+        btn_row.addWidget(cancel)
+        right.addLayout(btn_row)
+
+        root = QHBoxLayout(self)
+        root.addWidget(self.preview, 1)
+        root.addLayout(right, 1)
+        self._refresh()
+
+    def _processed_work(self) -> Image.Image:
+        out = crop_percent(self._work, self.s_left.value(),
+                           self.s_top.value(), self.s_right.value(),
+                           self.s_bottom.value())
+        if self.chk_bg.isChecked():
+            out = remove_white_background(out, cutoff=self.s_cut.value())
+        return out
+
+    def _refresh(self):
+        out = self._processed_work()
+        # Komposit di atas papan catur agar transparansi terlihat jelas
+        # (blok 2x2 ubin ditempel berulang — cepat, tanpa loop per piksel)
+        tile = 12
+        pat = Image.new("RGB", (2, 2))
+        pat.putdata([(255, 255, 255), (216, 216, 216),
+                     (216, 216, 216), (255, 255, 255)])
+        block = pat.resize((tile * 2, tile * 2), Image.Resampling.NEAREST)
+        board = Image.new("RGB", out.size, (255, 255, 255))
+        for y in range(0, out.height, tile * 2):
+            for x in range(0, out.width, tile * 2):
+                board.paste(block, (x, y))
+        board.paste(out, (0, 0), out)
+        buf = io.BytesIO()
+        board.save(buf, "PNG")
+        pix = QPixmap()
+        pix.loadFromData(buf.getvalue())
+        self.preview.setPixmap(pix)
+
+    def _accept(self):
+        dest = Path(tempfile.gettempdir()) / f"salmanpdf-prep-{self.src.stem}.png"
+        self.prepared = prepare_image(
+            self.src, dest, self.s_left.value(), self.s_top.value(),
+            self.s_right.value(), self.s_bottom.value(),
+            remove_bg=self.chk_bg.isChecked(), cutoff=self.s_cut.value())
+        self.accept()
 
 
 class ClickableLabel(QLabel):
@@ -158,10 +277,18 @@ class PdfEditorDialog(QDialog):
         path, _ = QFileDialog.getOpenFileName(
             self, "Pilih gambar", "",
             "Gambar (*.png *.jpg *.jpeg *.webp *.bmp);;Semua file (*)")
-        if path:
-            self.image_path = Path(path)
-            self.lbl_image.setText(self.image_path.name)
-            self.radio_image.setChecked(True)
+        if not path:
+            return
+        src = Path(path)
+        # Menu persiapan: crop + hapus background dengan halus
+        prep = ImagePrepDialog(src, self)
+        if prep.exec() and prep.prepared is not None:
+            self.image_path = prep.prepared
+            self.lbl_image.setText(f"{src.name} (disiapkan)")
+        else:
+            self.image_path = src
+            self.lbl_image.setText(src.name)
+        self.radio_image.setChecked(True)
 
     def _page_changed(self, value: int):
         self.page = value - 1
