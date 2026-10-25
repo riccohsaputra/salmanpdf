@@ -35,6 +35,7 @@ FILE_FILTER = (
 
 from .converters import ConversionError, convert_many, detect_kind, formats_for
 from .editor import ImageEditorDialog
+from .icons import tool_icon
 from .overlay import WheelOverlay
 from .pdf_editor import PdfEditorDialog
 from .statemachine import DragTracker
@@ -111,39 +112,43 @@ class ToolDropArea(QFrame):
 
 
 # ---------------------------------------------------------------- kartu alat
-_CARD_BASE = ("QFrame{background:#ffffff;border:1px solid #e7e1dc;"
+# PENTING: selector WAJIB ter-scope ke #toolCard. QLabel adalah subclass
+# QFrame di Qt — selector "QFrame{...}" polos MENULAR ke semua label anak
+# (kejadian v0.6.0: judul & deskripsi kartu ikut kena border).
+_CARD_BASE = ("#toolCard{background:#ffffff;border:1px solid #e7e1dc;"
               "border-radius:12px}")
-_CARD_HOVER = ("QFrame{background:#ffffff;border:1px solid #d92323;"
+_CARD_HOVER = ("#toolCard{background:#ffffff;border:1px solid #d92323;"
                "border-radius:12px}")
 
 
 class ToolCard(QFrame):
-    """Kartu alat persis gaya iLovePDF: chip ikon kecil di kiri-atas,
-    judul tebal di bawahnya, deskripsi abu dua baris. Vertikal, flat,
-    hover menyalakan tepi merah."""
+    """Kartu alat gaya iLovePDF: ikon vektor BESAR di kiri-atas, judul
+    tebal di bawahnya, deskripsi abu. Tinggi tetap, flat, hover merah."""
 
     clicked = Signal()
+    HEIGHT = 138
 
     def __init__(self, icon: str, title: str, desc: str, category: str):
         super().__init__()
+        self.setObjectName("toolCard")
         self.category = category
+        self._icon_name = icon
         self.setStyleSheet(_CARD_BASE)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(self.HEIGHT)
         self._desc = desc
-        self.icon_lbl = QLabel(icon)
-        self.icon_lbl.setFixedSize(32, 32)
-        self.icon_lbl.setAlignment(Qt.AlignCenter)
-        self.icon_lbl.setStyleSheet(
-            "background:#fdecec;border-radius:8px;font-size:15px")
+        self.icon_lbl = QLabel()
+        self.icon_lbl.setFixedSize(56, 56)
+        self.icon_lbl.setPixmap(tool_icon(icon, 56))
         self.title_lbl = QLabel(title)
         self.title_lbl.setStyleSheet(
-            "font-size:13.5px;font-weight:700;color:#23272f")
+            "font-size:14px;font-weight:700;color:#23272f")
         self.desc_lbl = QLabel(desc)
         self.desc_lbl.setWordWrap(True)
-        self.desc_lbl.setStyleSheet("font-size:10.5px;color:#7a7f87")
+        self.desc_lbl.setStyleSheet("font-size:11px;color:#7a7f87")
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(13, 11, 13, 11)
-        lay.setSpacing(5)
+        lay.setContentsMargins(14, 12, 14, 10)
+        lay.setSpacing(6)
         lay.addWidget(self.icon_lbl)
         lay.addWidget(self.title_lbl)
         lay.addWidget(self.desc_lbl)
@@ -163,9 +168,7 @@ class ToolCard(QFrame):
         super().mousePressEvent(event)
 
     def set_active(self, on: bool, desc: str | None = None) -> None:
-        self.icon_lbl.setStyleSheet(
-            f"background:{'#d92323' if on else '#fdecec'};"
-            "border-radius:8px;font-size:15px")
+        self.icon_lbl.setPixmap(tool_icon(self._icon_name, 56, active=on))
         self.desc_lbl.setText(desc if desc is not None else self._desc)
 
 
@@ -209,8 +212,10 @@ class MainWindow(QMainWindow):
 
         # ================= Header (ala iLovePDF) =================
         header = QFrame()
+        header.setObjectName("appHeader")
         header.setStyleSheet(
-            "QFrame{background:#ffffff;border-bottom:1px solid #e7e1dc}")
+            "#appHeader{background:#ffffff;"
+            "border-bottom:1px solid #e7e1dc}")
         h_lay = QHBoxLayout(header)
         h_lay.setContentsMargins(20, 10, 20, 10)
         logo = QLabel("S")
@@ -272,36 +277,36 @@ class MainWindow(QMainWindow):
 
         # ================= Grid kartu alat (4 kolom) =================
         self.card_gabung = ToolCard(
-            "🔗", "Gabung PDF", "Satukan banyak PDF menjadi satu file", "atur")
+            "gabung", "Gabung PDF", "Satukan banyak PDF menjadi satu file", "atur")
         self.card_gabung.clicked.connect(lambda: self.open_tool("gabung"))
         self.card_pisah = ToolCard(
-            "✂️", "Pisah PDF", "Pecah PDF menjadi satu file per halaman", "atur")
+            "pisah", "Pisah PDF", "Pecah PDF menjadi satu file per halaman", "atur")
         self.card_pisah.clicked.connect(lambda: self.open_tool("pisah"))
         self.card_kompres = ToolCard(
-            "🗜️", "Kompres PDF", "Kecilkan PDF ke target ukuran yang kamu mau",
+            "kompres", "Kompres PDF", "Kecilkan PDF ke target ukuran yang kamu mau",
             "atur")
         self.card_kompres.clicked.connect(lambda: self.open_tool("kompres"))
         self.card_editpdf = ToolCard(
-            "📝", "Edit PDF", "Tempel teks & gambar ke dalam PDF", "edit")
+            "edit", "Edit PDF", "Tempel teks & gambar ke dalam PDF", "edit")
         self.card_editpdf.clicked.connect(lambda: self.open_tool("editpdf"))
         self.card_pdfimg = ToolCard(
-            "🖼️", "PDF ke Gambar", "Ubah tiap halaman PDF menjadi JPG",
+            "pdfimg", "PDF ke Gambar", "Ubah tiap halaman PDF menjadi JPG",
             "konversi")
         self.card_pdfimg.clicked.connect(lambda: self.open_tool("pdfimg"))
         self.card_imgpdf = ToolCard(
-            "📄", "Gambar ke PDF", "Jadikan gambar (banyak sekaligus) satu PDF",
+            "imgpdf", "Gambar ke PDF", "Jadikan gambar (banyak sekaligus) satu PDF",
             "konversi")
         self.card_imgpdf.clicked.connect(lambda: self.open_tool("imgpdf"))
         self.card_office = ToolCard(
-            "🗂️", "Office ke PDF", "DOCX, PPTX, XLSX, ODT jadi PDF rapi",
+            "office", "Office ke PDF", "DOCX, PPTX, XLSX, ODT jadi PDF rapi",
             "konversi")
         self.card_office.clicked.connect(lambda: self.open_tool("office"))
         self.card_crop = ToolCard(
-            "🎨", "Crop & Add BG", "Potong gambar + beri background & shadow",
+            "crop", "Crop & Add BG", "Potong gambar + beri background & shadow",
             "edit")
         self.card_crop.clicked.connect(lambda: self.open_tool("crop"))
         self.card_global = ToolCard(
-            "🖱️", "Mode Global", "Shift + seret file di Nemo, wheel muncul",
+            "global", "Mode Global", "Shift + seret file di Nemo, wheel muncul",
             "lainnya")
         self.card_global.clicked.connect(self.toggle_global)
 
@@ -315,8 +320,9 @@ class MainWindow(QMainWindow):
 
         # ================= Sidebar kanan: wheel + status =================
         wheel_box = QFrame()
+        wheel_box.setObjectName("wheelBox")
         wheel_box.setStyleSheet(
-            "QFrame{background:#ffffff;border:1px solid #e7e1dc;"
+            "#wheelBox{background:#ffffff;border:1px solid #e7e1dc;"
             "border-radius:14px}")
         wheel_box.setFixedSize(248, 248)
         wb_lay = QVBoxLayout(wheel_box)
@@ -345,8 +351,16 @@ class MainWindow(QMainWindow):
         body.addWidget(hero_sub)
         body.addLayout(pills_row)
         body.addLayout(content_row, 1)
+        inner = QWidget()
+        inner.setMaximumWidth(1180)
+        inner.setLayout(body)
+        home_outer = QHBoxLayout()
+        home_outer.setContentsMargins(0, 0, 0, 0)
+        home_outer.addStretch(1)
+        home_outer.addWidget(inner)
+        home_outer.addStretch(1)
         home_page = QWidget()
-        home_page.setLayout(body)
+        home_page.setLayout(home_outer)
 
         self._stack = QStackedWidget()
         self._stack.addWidget(home_page)
