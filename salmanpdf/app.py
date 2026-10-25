@@ -378,9 +378,11 @@ class MainWindow(QMainWindow):
         hero_sub.setMaximumWidth(920)
         # QLabel word-wrap di VBox sering salah hitung tinggi (teks
         # kegencet/terpotong vertikal — dilaporkan Ricco 2026-10-25).
-        # Kunci tinggi minimum 2 baris supaya selalu lega.
-        hero_sub.setMinimumHeight(48)
-        hero_sub.setStyleSheet("font-size:14.5px;color:#6b7280")
+        # Teks ini membungkus jadi 3 baris pada lebar jendela umum:
+        # kunci tinggi minimum 3 baris + padding supaya selalu lega.
+        hero_sub.setMinimumHeight(78)
+        hero_sub.setStyleSheet(
+            "font-size:14.5px;color:#6b7280;padding:6px 0")
 
         # ================= Filter pills (ala iLovePDF) =================
         self._pills: list[tuple[QPushButton, str | None]] = []
@@ -605,13 +607,17 @@ class MainWindow(QMainWindow):
         lay.addLayout(top)
         self.tool_title = QLabel("")
         self.tool_title.setAlignment(Qt.AlignCenter)
+        self.tool_title.setMinimumHeight(50)
         self.tool_title.setStyleSheet(
-            "font-size:29px;font-weight:800;color:#23272f")
+            "font-size:29px;font-weight:800;color:#23272f;"
+            "padding:6px 0 2px 0")
         lay.addWidget(self.tool_title)
         self.tool_desc = QLabel("")
         self.tool_desc.setAlignment(Qt.AlignCenter)
         self.tool_desc.setWordWrap(True)
-        self.tool_desc.setStyleSheet("font-size:13px;color:#7a7f87")
+        self.tool_desc.setMinimumHeight(40)
+        self.tool_desc.setStyleSheet(
+            "font-size:13px;color:#7a7f87;padding:2px 0")
         lay.addWidget(self.tool_desc)
         self.tool_area = ToolDropArea()
         self.tool_area.filesDropped.connect(self._tool_accept)
@@ -780,7 +786,7 @@ class MainWindow(QMainWindow):
             "padding:8px 0 4px 0")
         if self._hero_sub is not None:
             self._hero_sub.setStyleSheet(
-                f"font-size:14.5px;color:{c['sub']}")
+                f"font-size:14.5px;color:{c['sub']};padding:6px 0")
         self.info.setStyleSheet(f"font-size:12px;color:{c['status']}")
         self.status.setStyleSheet(f"font-size:12px;color:{c['status']}")
         self._credit.setStyleSheet(
@@ -795,9 +801,10 @@ class MainWindow(QMainWindow):
         self._home_scroll.viewport().setStyleSheet(
             f"background:{c['page']}")
         self.tool_title.setStyleSheet(
-            f"font-size:29px;font-weight:800;color:{c['title']}")
+            f"font-size:29px;font-weight:800;color:{c['title']};"
+            "padding:6px 0 2px 0")
         self.tool_desc.setStyleSheet(
-            f"font-size:13px;color:{c['sub']}")
+            f"font-size:13px;color:{c['sub']};padding:2px 0")
         self.tool_files_lbl.setStyleSheet(
             f"font-size:12.5px;color:{c['title']}")
         self.tool_status.setStyleSheet(
