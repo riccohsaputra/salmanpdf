@@ -3,6 +3,12 @@
 Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
 Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
 
+## v0.11.1 — 2026-10-27
+- Klik tombol Update saat aplikasi sudah versi terbaru kini memunculkan
+  pemberitahuan dialog "SalmanPDF sudah dalam versi terbaru" (berlaku
+  di semua OS), dan ada pesan terpisah bila server update tidak
+  terjangkau.
+
 ## v0.11.0 — 2026-10-27
 - Tombol 🔄 Update di header + cek update otomatis saat aplikasi dibuka:
   ada versi baru -> muncul pemberitahuan beserta detail perubahannya,

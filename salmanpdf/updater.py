@@ -68,22 +68,35 @@ def changelog_between(changelog_md: str, current: str,
     return "\n\n".join(out)
 
 
-def check_update(current: str,
-                 fetch: Callable[[str], str] = fetch_text) -> dict | None:
+def check_update_detailed(current: str,
+                          fetch: Callable[[str], str] = fetch_text) -> dict:
     """
-    Return None bila sudah versi terbaru / data tak terbaca.
-    Return dict {latest, notes} bila ada versi lebih baru.
-    Kegagalan jaringan -> None (pemanggil mode senyap tidak mengganggu).
+    Hasil cek update terperinci:
+    {"state": "update", "latest": ..., "notes": ...} — ada versi baru
+    {"state": "current", "latest": ...}              — sudah paling baru
+    {"state": "error"}                               — server tak terjangkau
     """
     try:
         latest = parse_latest_version(fetch(INIT_URL))
-        if latest is None or not is_newer(latest, current):
-            return None
-        notes = ""
-        try:
-            notes = changelog_between(fetch(CHANGELOG_URL), current, latest)
-        except Exception:
-            notes = ""
-        return {"latest": latest, "notes": notes}
     except Exception:
-        return None
+        return {"state": "error"}
+    if latest is None:
+        return {"state": "error"}
+    if not is_newer(latest, current):
+        return {"state": "current", "latest": latest}
+    notes = ""
+    try:
+        notes = changelog_between(fetch(CHANGELOG_URL), current, latest)
+    except Exception:
+        notes = ""
+    return {"state": "update", "latest": latest, "notes": notes}
+
+
+def check_update(current: str,
+                 fetch: Callable[[str], str] = fetch_text) -> dict | None:
+    """
+    Return dict {latest, notes} bila ada versi lebih baru, selain itu
+    None (sudah terbaru / gagal cek) — untuk pemanggil mode senyap.
+    """
+    res = check_update_detailed(current, fetch)
+    return res if res["state"] == "update" else None

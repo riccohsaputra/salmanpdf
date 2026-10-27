@@ -52,3 +52,14 @@ def test_check_update_jaringan_gagal_senyap():
     def boom(url: str) -> str:
         raise OSError("offline")
     assert U.check_update("0.9.0", fetch=boom) is None
+
+
+def test_check_update_detailed_states():
+    assert U.check_update_detailed(
+        "0.9.0", fetch=fake_fetch_factory())["state"] == "update"
+    cur = U.check_update_detailed("0.11.0", fetch=fake_fetch_factory())
+    assert cur["state"] == "current" and cur["latest"] == "0.11.0"
+
+    def boom(url: str) -> str:
+        raise OSError("offline")
+    assert U.check_update_detailed("0.9.0", fetch=boom)["state"] == "error"

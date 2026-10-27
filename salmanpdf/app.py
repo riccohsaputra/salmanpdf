@@ -24,7 +24,8 @@ from PySide6.QtGui import (QDesktopServices, QIcon, QImage,
                            QPainter, QPixmap)
 from PySide6.QtWidgets import (
     QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
-    QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
+    QInputDialog, QLabel, QMainWindow, QMessageBox, QProgressBar,
+    QPushButton,
     QTextEdit,
     QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
@@ -129,7 +130,7 @@ class UpdateWorker(QThread):
         self._current = current
 
     def run(self):  # noqa: N802 (Qt API)
-        self.done.emit(updater.check_update(self._current))
+        self.done.emit(updater.check_update_detailed(self._current))
 
 
 class PullWorker(QThread):
@@ -1075,12 +1076,22 @@ class MainWindow(QMainWindow):
         self._settings.setValue("last_update_check", int(_time.time()))
         from . import __version__
 
-        if info:
+        state = (info or {}).get("state")
+        if state == "update":
             self._show_update_dialog(info)
         elif getattr(self, "_upd_manual", False):
-            self.status.setText(
-                f"✅ Tidak ada update lebih baru — kamu di v{__version__} "
-                "(atau server update sedang tidak terjangkau).")
+            if state == "current":
+                QMessageBox.information(
+                    self, "Cek Update",
+                    "✅ SalmanPDF sudah dalam versi terbaru.\n\n"
+                    f"Kamu memakai v{__version__} — ini versi paling "
+                    "baru saat ini, belum ada update yang lebih baru.")
+            else:
+                QMessageBox.warning(
+                    self, "Cek Update",
+                    "⚠️ Pemeriksaan update tidak berhasil — server "
+                    "update sedang tidak terjangkau. Periksa koneksi "
+                    "internetmu, lalu coba lagi.")
 
     def _show_update_dialog(self, info: dict) -> None:
         from . import __version__
