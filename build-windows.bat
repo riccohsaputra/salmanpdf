@@ -10,7 +10,7 @@ cd /d %~dp0
 
 echo [1/4] Memasang dependency...
 python -m pip install --upgrade pip
-python -m pip install PySide6-Essentials PyMuPDF Pillow pyinstaller
+python -m pip install PySide6-Essentials PyMuPDF Pillow pyinstaller pywin32
 if errorlevel 1 goto :gagal
 
 echo [2/4] Menyiapkan ikon (.ico)...
@@ -27,7 +27,7 @@ powershell -Command "Compress-Archive -Path dist\SalmanPDF -DestinationPath Salm
 echo.
 echo SELESAI: dist\SalmanPDF\SalmanPDF.exe
 echo Zip siap bagikan: SalmanPDF-Windows.zip
-echo Catatan: konversi Office butuh LibreOffice terpasang terpisah.
+echo Catatan: konversi Office memakai Microsoft Office (bila ada) atau LibreOffice.
 pause
 exit /b 0
 

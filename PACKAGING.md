@@ -13,10 +13,12 @@ Linux) dan SATU fitur khusus platform:
 | Mode Global (Shift+seret dari file manager) | ✅ khusus sesi X11 | ❌ (fitur X11) | ❌ (fitur X11) |
 | Daftar font sistem di Edit PDF | semua font fontconfig | daftar cadangan (font bawaan PDF) bila fontconfig absen | idem |
 
-Syarat bersama: konversi dokumen Office memakai **LibreOffice** yang
-terpasang terpisah di mesin pengguna (di semua OS). Tanpa LibreOffice,
-alat Office menampilkan pesan bahwa LibreOffice tidak ditemukan —
-fitur lain tidak terpengaruh.
+Syarat bersama: konversi dokumen Office memakai aplikasi dokumen yang
+terpasang di mesin pengguna — **Microsoft Office** (khusus Windows,
+lewat COM/pywin32; dipakai lebih dulu bila ada) atau **LibreOffice**
+(semua OS). Tanpa keduanya, alat Office menampilkan pesan bahwa tidak
+ada aplikasi Office yang ditemukan — fitur lain tidak terpengaruh.
+Target ODP/ODS hanya didukung LibreOffice.
 
 ## Windows
 

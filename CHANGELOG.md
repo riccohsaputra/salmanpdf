@@ -3,6 +3,15 @@
 Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
 Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
 
+## v0.12.0 — 2026-10-27
+- Konversi Office sekarang dua backend: di Windows, dokumen
+  dikonversi memakai Microsoft Office asli (Word/PowerPoint/Excel
+  lewat COM) bila terpasang — hasil render persis aplikasi aslinya —
+  dengan LibreOffice sebagai cadangan di semua OS. Target ODP/ODS
+  tetap khusus LibreOffice (aplikasi Microsoft tidak bisa menyimpan
+  kedua format itu). Bila MS Office gagal di tengah jalan, otomatis
+  dicoba ulang lewat LibreOffice.
+
 ## v0.11.4 — 2026-10-27
 - Repo GitHub resmi berganti nama: riccohsaputra/tangerine-linux →
   riccohsaputra/salmanpdf. Updater sekarang menunjuk nama baru

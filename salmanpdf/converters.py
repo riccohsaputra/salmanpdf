@@ -6,7 +6,8 @@ Semua konversi jalan lokal (tanpa upload):
 - Gambar -> PDF   : Pillow (banyak gambar = digabung satu PDF)
 - PDF  -> TXT     : PyMuPDF text extraction (bukan OCR)
 - PDF tools       : GABUNG (merge), PISAH (split), KOMPRES (target size)
-- Office          : LibreOffice headless (soffice) untuk docx/pptx/xlsx/odt/dll
+- Office          : Microsoft Office via COM (Windows) atau LibreOffice
+                    headless (soffice) untuk docx/pptx/xlsx/odt/dll
 - TXT  -> PDF     : PyMuPDF
 
 (Video/audio SENGAJA tidak didukung — dihapus atas permintaan user,
@@ -21,6 +22,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -316,36 +318,29 @@ def compress_pdf(src: Path, target_bytes: int) -> list[Path]:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-# ---------------------------------------------------------------- Office (LibreOffice)
-def office_convert(src: Path, fmt: str) -> list[Path]:
-    """
-    Konversi dokumen Office via LibreOffice headless (soffice).
-    Mendukung word/slides/sheet -> PDF/TXT/DOCX/ODT/PPTX/ODP/CSV/XLSX/ODS
-    sesuai ROUTES. Output ditulis ke temp dulu lalu dipindah ke sebelah
-    file asli dengan nama unik.
-    """
+# ---------------------------------------------------------------- Office (MS Office / LibreOffice)
+def _find_soffice() -> str | None:
+    """Lokasi biner LibreOffice (PATH atau lokasi instalasi baku per OS)."""
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if soffice is None:
-        # Cadangan: lokasi instalasi baku LibreOffice per OS (sering tidak
-        # masuk PATH di Windows/macOS)
-        import sys as _sys
+    if soffice is not None:
+        return soffice
+    if sys.platform.startswith("win"):
+        cands = [
+            r"C:\Program Files\LibreOffice\program\soffice.exe",
+            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        ]
+    elif sys.platform == "darwin":
+        cands = ["/Applications/LibreOffice.app/Contents/MacOS/soffice"]
+    else:
+        cands = ["/usr/bin/soffice", "/snap/bin/libreoffice"]
+    for c in cands:
+        if Path(c).exists():
+            return c
+    return None
 
-        if _sys.platform.startswith("win"):
-            _cands = [
-                r"C:\Program Files\LibreOffice\program\soffice.exe",
-                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-            ]
-        elif _sys.platform == "darwin":
-            _cands = ["/Applications/LibreOffice.app/Contents/MacOS/soffice"]
-        else:
-            _cands = ["/usr/bin/soffice", "/snap/bin/libreoffice"]
-        for _c in _cands:
-            if Path(_c).exists():
-                soffice = _c
-                break
-    if soffice is None:
-        raise ConversionError(
-            "LibreOffice belum terinstall. Install dulu: sudo apt install libreoffice")
+
+def _office_convert_libre(src: Path, fmt: str, soffice: str) -> list[Path]:
+    """Konversi via LibreOffice headless; output di sebelah file asli."""
     target = fmt.lower()
     convert_arg = "txt:Text" if target == "txt" else target
     with tempfile.TemporaryDirectory(prefix="tng-office-") as td:
@@ -363,6 +358,54 @@ def office_convert(src: Path, fmt: str) -> list[Path]:
         dest = unique_output(src, target)
         shutil.move(str(produced), str(dest))
     return [dest]
+
+
+def office_convert(src: Path, fmt: str) -> list[Path]:
+    """
+    Konversi dokumen Office (word/slides/sheet -> format di ROUTES).
+
+    Urutan backend:
+    1. Microsoft Office asli via COM — hanya Windows, dan hanya untuk
+       pasangan format yang didukung aplikasinya (mis. PowerPoint
+       tidak bisa ODP, Excel tidak bisa ODS).
+    2. LibreOffice headless (semua OS) sebagai cadangan/universal.
+    Kegagalan backend pertama dicatat lalu backend berikutnya dicoba;
+    bila keduanya tidak tersedia/gagal, pesan errornya menjelaskan
+    dua-duanya supaya user tahu harus memasang apa.
+    """
+    from . import msoffice
+
+    kind = detect_kind(src)
+    target = fmt.lower()
+    ms_error: str | None = None
+    if msoffice.available_plan(kind, target) is not None:
+        try:
+            with tempfile.TemporaryDirectory(prefix="tng-msoffice-") as td:
+                out = Path(td) / f"{src.stem}.{target}"
+                msoffice.convert_with_ms_office(src, kind, target, out)
+                dest = unique_output(src, target)
+                shutil.move(str(out), str(dest))
+            return [dest]
+        except msoffice.MsOfficeError as e:
+            ms_error = str(e)
+    soffice = _find_soffice()
+    if soffice is not None:
+        return _office_convert_libre(src, fmt, soffice)
+    if ms_error is not None:
+        raise ConversionError(
+            f"Microsoft Office gagal mengonversi ({ms_error}), dan "
+            "LibreOffice tidak ditemukan. Pasang LibreOffice sebagai "
+            "cadangan, atau perbaiki instalasi Microsoft Office-nya.")
+    if sys.platform.startswith("win") and msoffice.plan_for(kind, target) is None \
+            and msoffice.find_ms_apps():
+        raise ConversionError(
+            f"Microsoft Office tidak bisa menyimpan format {fmt.upper()} — "
+            f"konversi ini butuh LibreOffice, yang tidak ditemukan. "
+            "Pasang LibreOffice lalu coba lagi.")
+    raise ConversionError(
+        "Konversi Office membutuhkan Microsoft Office (Windows) atau "
+        "LibreOffice — keduanya tidak ditemukan di komputer ini. "
+        "Pasang salah satunya lalu coba lagi.")
 
 
 # ---------------------------------------------------------------- API utama

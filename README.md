@@ -1,4 +1,4 @@
-# SalmanPDF — Prototipe v0.11.4 (drop-zone + mode global Shift+Drag)
+# SalmanPDF — Prototipe v0.12.0 (drop-zone + mode global Shift+Drag)
 
 Kloningan konsep **Tangerine for Mac** (drag file → tahan Shift → wheel format)
 yang disesuaikan untuk **Linux Mint**. Semua konversi **100% lokal**, tanpa upload.
@@ -46,15 +46,18 @@ Syarat & keterbatasan jujur:
 | Banyak PDF sekaligus | **GABUNG** (+ semua format PDF di atas) | PyMuPDF |
 | Gambar (JPG/PNG/WebP/BMP/TIFF/GIF) | JPG, PNG, WebP, PDF | Pillow |
 | Banyak gambar sekaligus | PDF (digabung jadi 1 PDF) | Pillow |
-| Dokumen (DOCX/DOC/ODT/RTF) | PDF, TXT, DOCX, ODT | LibreOffice |
-| Presentasi (PPTX/PPT/ODP) | PDF, PPTX, ODP | LibreOffice |
-| Spreadsheet (XLSX/XLS/ODS) | PDF, CSV, XLSX, ODS | LibreOffice |
+| Dokumen (DOCX/DOC/ODT/RTF) | PDF, TXT, DOCX, ODT | MS Office / LibreOffice |
+| Presentasi (PPTX/PPT/ODP) | PDF, PPTX, ODP | MS Office / LibreOffice |
+| Spreadsheet (XLSX/XLS/ODS) | PDF, CSV, XLSX, ODS | MS Office / LibreOffice |
 | Teks (TXT/MD/LOG/CSV/INI/SH/PY/JSON/dll) | PDF | PyMuPDF |
 
 > Video & audio **sengaja tidak didukung** (dihapus di v0.4.0 atas
-> permintaan user — fokus ke dokumen, gambar, PDF). Konversi Office butuh
-> LibreOffice terinstall (`sudo apt install libreoffice`; di Linux Mint
-> biasanya sudah bawaan).
+> permintaan user — fokus ke dokumen, gambar, PDF). Konversi Office di
+> Windows memakai Microsoft Office asli bila terpasang (hasil render
+> persis aplikasi aslinya), dengan LibreOffice sebagai cadangan di semua
+> OS (`sudo apt install libreoffice`; di Linux Mint biasanya bawaan).
+> Target ODP/ODS hanya bisa lewat LibreOffice — aplikasi Microsoft
+> tidak bisa menyimpan kedua format itu.
 
 **PDF tools (v0.4.0):** GABUNG = banyak PDF jadi satu; PISAH = satu PDF
 per halaman; KOMPRES = kecilkan PDF ke **target ukuran yang kamu tentukan
