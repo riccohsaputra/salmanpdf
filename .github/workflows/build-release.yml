@@ -1,0 +1,80 @@
+# ============================================================
+#  GitHub Actions: build SalmanPDF untuk Windows, macOS, Linux
+#  Cara pakai: di web GitHub buat berkas
+#    .github/workflows/build-release.yml
+#  lalu tempel SELURUH isi berkas ini ke sana.
+#  Rilis: push tag v* (mis. v0.12.0) -> ketiga OS dibangun dan
+#  hasilnya terbit sebagai GitHub Release berisi file unduhan.
+#  Bisa juga dijalankan manual dari tab Actions (workflow_dispatch).
+# ============================================================
+name: build-salmanpdf
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: SalmanPDF-Windows
+          - os: macos-latest
+            artifact: SalmanPDF-macOS
+          - os: ubuntu-latest
+            artifact: SalmanPDF-Linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6-Essentials PyMuPDF Pillow pyinstaller
+      - name: Icons
+        run: python make_icon.py
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        run: pyinstaller --noconfirm --windowed --name SalmanPDF --icon salmanpdf/assets/appicon.ico --exclude-module Xlib main.py
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p build/SalmanPDF.iconset
+          for s in 16 32 128 256 512; do sips -z $s $s salmanpdf/assets/appicon-1024.png --out build/SalmanPDF.iconset/icon_${s}x${s}.png >/dev/null; done
+          for s in 32 64 256 512 1024; do h=$((s/2)); sips -z $s $s salmanpdf/assets/appicon-1024.png --out build/SalmanPDF.iconset/icon_${h}x${h}@2x.png >/dev/null; done
+          iconutil -c icns build/SalmanPDF.iconset -o build/SalmanPDF.icns
+          pyinstaller --noconfirm --windowed --name SalmanPDF --icon build/SalmanPDF.icns --exclude-module Xlib main.py
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: pyinstaller --noconfirm --windowed --name SalmanPDF main.py
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: Compress-Archive -Path dist/SalmanPDF -DestinationPath SalmanPDF-Windows.zip -Force
+        shell: powershell
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent dist/SalmanPDF.app SalmanPDF-macOS.zip
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: cd dist && tar -czf ../SalmanPDF-Linux.tar.gz SalmanPDF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            SalmanPDF-Windows.zip
+            SalmanPDF-macOS.zip
+            SalmanPDF-Linux.tar.gz
+          if-no-files-found: ignore
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            SalmanPDF-Windows.zip
+            SalmanPDF-macOS.zip
+            SalmanPDF-Linux.tar.gz
+          fail_on_unmatched_files: false
