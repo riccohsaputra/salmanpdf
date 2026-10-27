@@ -1,11 +1,17 @@
 # ============================================================
 #  GitHub Actions: build SalmanPDF untuk Windows, macOS, Linux
-#  Cara pakai: di web GitHub buat berkas
-#    .github/workflows/build-release.yml
-#  lalu tempel SELURUH isi berkas ini ke sana.
-#  Rilis: push tag v* (mis. v0.12.0) -> ketiga OS dibangun dan
-#  hasilnya terbit sebagai GitHub Release berisi file unduhan.
-#  Bisa juga dijalankan manual dari tab Actions (workflow_dispatch).
+#  Berkas aktif: .github/workflows/build-release.yml
+#  (berkas .txt ini salinan sumbernya untuk dibaca/diedit lokal)
+#  Rilis: push tag v* (mis. v0.12.0) -> ketiga OS dibangun,
+#  lalu SATU job "publish" mengumpulkan semua hasilnya dan
+#  menerbitkannya sebagai GitHub Release berisi file unduhan.
+#  Bisa juga dijalankan manual dari tab Actions (workflow_dispatch)
+#  — run manual tidak menerbitkan rilis, hanya artefak.
+#
+#  Riwayat perbaikan: versi pertama gagal di langkah publikasi
+#  (tiap job matrix berebut mengedit rilis yang sama + token tanpa
+#  izin tulis eksplisit). Sekarang: permissions contents: write +
+#  job publish tunggal setelah semua build selesai.
 # ============================================================
 name: build-salmanpdf
 
@@ -13,6 +19,9 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -69,12 +78,23 @@ jobs:
             SalmanPDF-macOS.zip
             SalmanPDF-Linux.tar.gz
           if-no-files-found: ignore
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: SalmanPDF-*
+          merge-multiple: true
+          path: release-files
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            SalmanPDF-Windows.zip
-            SalmanPDF-macOS.zip
-            SalmanPDF-Linux.tar.gz
-          fail_on_unmatched_files: false
+            release-files/SalmanPDF-Windows.zip
+            release-files/SalmanPDF-macOS.zip
+            release-files/SalmanPDF-Linux.tar.gz
+          fail_on_unmatched_files: true
