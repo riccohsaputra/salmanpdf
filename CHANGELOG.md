@@ -3,6 +3,14 @@
 Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
 Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
 
+## v0.11.3 — 2026-10-27
+- Perbaikan build GitHub Actions: langkah Icons gagal di run pertama
+  karena icon-source-ref.png (berkas biner) memang tidak ada di repo.
+  make_icon.py sekarang memakai ikon tertanam di salmanpdf/icon_data.py
+  bila berkas sumber itu tidak ada, jadi build Windows/macOS/Linux di
+  CI bisa berjalan. Data ikon tertanam juga disegarkan dari berkas
+  sumber asli (byte-exact).
+
 ## v0.11.2 — 2026-10-27
 - Tombol Update di instalasi checkout (Linux) sekarang memeriksa &
   memasang update lewat git lokal — bekerja walau repo privat, tanpa
