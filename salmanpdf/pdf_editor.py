@@ -16,10 +16,13 @@ from PySide6.QtCore import QEvent, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QRadioButton, QScrollArea, QSlider,
-    QSpinBox, QVBoxLayout,
+    QGridLayout, QLabel, QLineEdit, QPushButton, QRadioButton,
+    QScrollArea, QSlider, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from .converters import (
+    ConversionError, extract_pages, parse_page_spec, split_pdf_groups,
+)
 from .imgprep import crop_percent, prepare_image, remove_white_background
 from .pdfedit import (
     BASE14, apply_edits, font_file_for, hit_test, list_system_fonts,
@@ -551,3 +554,166 @@ def _measure_text(text: str, family: str, size: int) -> float:
             text, fontname=BASE14.get(family, "helv"), fontsize=size)
     except Exception:
         return len(text) * size * 0.52
+
+
+class SplitDialog(QDialog):
+    """Pisah PDF manual: user menentukan sendiri halaman yang dipisah.
+    Mode Rentang: tiap kelompok (dipisah koma) menjadi satu PDF.
+    Mode Ekstrak: semua halaman pilihan digabung jadi satu PDF."""
+
+    _CHIP_ON = ("background:#d92323;color:#ffffff;border-radius:4px;"
+                "padding:3px 0;font-size:11px;font-weight:700")
+    _CHIP_OFF = ("background:#eceff3;color:#555b63;border-radius:4px;"
+                 "padding:3px 0;font-size:11px")
+
+    def __init__(self, src: Path, parent=None):
+        super().__init__(parent)
+        self.src = Path(src)
+        self.saved_paths: list[Path] = []
+        import pymupdf
+
+        with pymupdf.open(self.src) as doc:
+            self.total = doc.page_count
+        self.setWindowTitle(f"Pisah PDF — {self.src.name}")
+        self.setMinimumWidth(620)
+
+        root = QVBoxLayout(self)
+        root.addWidget(QLabel(
+            f"<b>{self.src.name}</b> — {self.total} halaman"))
+
+        mode_row = QHBoxLayout()
+        self.rb_rentang = QRadioButton(
+            "Rentang: tiap kelompok jadi 1 PDF")
+        self.rb_rentang.setChecked(True)
+        self.rb_ekstrak = QRadioButton(
+            "Ekstrak: pilihan jadi 1 PDF gabungan")
+        self.rb_rentang.toggled.connect(self._validate)
+        mode_row.addWidget(self.rb_rentang)
+        mode_row.addWidget(self.rb_ekstrak)
+        mode_row.addStretch(1)
+        root.addLayout(mode_row)
+
+        self.edit_spec = QLineEdit()
+        self.edit_spec.setPlaceholderText("contoh: 1-3, 5, 8-10")
+        self.edit_spec.textChanged.connect(self._validate)
+        root.addWidget(self.edit_spec)
+
+        quick = QHBoxLayout()
+        for label, fn in (("Semua halaman", self._fill_all),
+                          ("Ganjil saja", self._fill_odd),
+                          ("Genap saja", self._fill_even),
+                          ("Bersihkan", lambda: self.edit_spec.clear())):
+            btn = QPushButton(label)
+            btn.clicked.connect(fn)
+            quick.addWidget(btn)
+        quick.addStretch(1)
+        root.addLayout(quick)
+
+        self.lbl_fb = QLabel("Tulis nomor/rentang halaman, dipisah koma.")
+        self.lbl_fb.setWordWrap(True)
+        root.addWidget(self.lbl_fb)
+
+        self._chips_host = QWidget()
+        self._chips_lay = QGridLayout(self._chips_host)
+        self._chips_lay.setSpacing(4)
+        self._chip_scroll = QScrollArea()
+        self._chip_scroll.setWidget(self._chips_host)
+        self._chip_scroll.setWidgetResizable(True)
+        self._chip_scroll.setFixedHeight(118)
+        root.addWidget(self._chip_scroll)
+        self._chips: list[QLabel] = []
+        self._build_chips()
+
+        btn_row = QHBoxLayout()
+        self.btn_save = QPushButton("✂️ Pisahkan")
+        self.btn_save.setEnabled(False)
+        self.btn_save.clicked.connect(self._save)
+        btn_row.addWidget(self.btn_save)
+        cancel = QPushButton("Batal")
+        cancel.clicked.connect(self.reject)
+        btn_row.addWidget(cancel)
+        btn_row.addStretch(1)
+        root.addLayout(btn_row)
+        self._validate()
+
+    # ------------------------------------------------------------ bantuan isi
+    def _fill_all(self):
+        self.edit_spec.setText(f"1-{self.total}")
+
+    def _fill_odd(self):
+        self.edit_spec.setText(
+            ", ".join(str(i) for i in range(1, self.total + 1, 2)))
+
+    def _fill_even(self):
+        self.edit_spec.setText(
+            ", ".join(str(i) for i in range(2, self.total + 1, 2)))
+
+    # ------------------------------------------------------------ pratinjau
+    def _build_chips(self):
+        if self.total > 200:
+            self._chip_scroll.hide()
+            return
+        for i in range(self.total):
+            chip = QLabel(str(i + 1))
+            chip.setAlignment(Qt.AlignCenter)
+            chip.setMinimumWidth(30)
+            chip.setStyleSheet(self._CHIP_OFF)
+            self._chips_lay.addWidget(chip, i // 10, i % 10)
+            self._chips.append(chip)
+
+    def _paint_chips(self, included: set[int]):
+        for i, chip in enumerate(self._chips):
+            chip.setStyleSheet(
+                self._CHIP_ON if i in included else self._CHIP_OFF)
+
+    # ------------------------------------------------------------ inti
+    def _groups(self) -> list[list[int]]:
+        return parse_page_spec(self.edit_spec.text(), self.total)
+
+    def _validate(self):
+        rentang = self.rb_rentang.isChecked()
+        self.edit_spec.setPlaceholderText(
+            "contoh: 1-3, 5, 8-10" if rentang else "contoh: 1, 3, 5-7")
+        if not self.edit_spec.text().strip():
+            self.lbl_fb.setText(
+                "Tulis nomor/rentang halaman, dipisah koma.")
+            self.lbl_fb.setStyleSheet("")
+            self.btn_save.setEnabled(False)
+            self._paint_chips(set())
+            return
+        try:
+            groups = self._groups()
+        except ConversionError as e:
+            self.lbl_fb.setText(f"⚠️ {e}")
+            self.lbl_fb.setStyleSheet("color:#c81e1e")
+            self.btn_save.setEnabled(False)
+            self._paint_chips(set())
+            return
+        included = {pg for g in groups for pg in g}
+        self._paint_chips(included)
+        self.lbl_fb.setStyleSheet("color:#137333")
+        if rentang:
+            ringkas = " • ".join(
+                f"{g[0] + 1}" if len(g) == 1 else f"{g[0] + 1}–{g[-1] + 1}"
+                for g in groups)
+            self.lbl_fb.setText(
+                f"Hasil: {len(groups)} file PDF ({ringkas}) — "
+                f"total {len(included)} halaman.")
+        else:
+            self.lbl_fb.setText(
+                f"Hasil: 1 file PDF berisi {len(included)} halaman pilihan.")
+        self.btn_save.setEnabled(True)
+
+    def _save(self):
+        try:
+            groups = self._groups()
+            if self.rb_rentang.isChecked():
+                self.saved_paths = split_pdf_groups(self.src, groups)
+            else:
+                flat = [pg for g in groups for pg in g]
+                self.saved_paths = [extract_pages(self.src, flat)]
+        except ConversionError as e:
+            self.lbl_fb.setText(f"⚠️ {e}")
+            self.lbl_fb.setStyleSheet("color:#c81e1e")
+            return
+        self.accept()

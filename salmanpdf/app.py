@@ -38,7 +38,7 @@ from .converters import ConversionError, convert_many, detect_kind, formats_for
 from .editor import BgRemoveDialog, ImageEditorDialog
 from .icons import tool_icon
 from .overlay import WheelOverlay
-from .pdf_editor import PdfEditorDialog
+from .pdf_editor import PdfEditorDialog, SplitDialog
 from .statemachine import DragTracker
 from .wheel import WheelWidget
 from .xpoll import X11Poller, session_is_x11
@@ -406,7 +406,7 @@ class MainWindow(QMainWindow):
             "gabung", "Gabung PDF", "Satukan banyak PDF menjadi satu file", "atur")
         self.card_gabung.clicked.connect(lambda: self.open_tool("gabung"))
         self.card_pisah = ToolCard(
-            "pisah", "Pisah PDF", "Pecah PDF menjadi satu file per halaman", "atur")
+            "pisah", "Pisah PDF", "Pilih sendiri halaman yang mau dipisah jadi PDF baru", "atur")
         self.card_pisah.clicked.connect(lambda: self.open_tool("pisah"))
         self.card_kompres = ToolCard(
             "kompres", "Kompres PDF", "Kecilkan PDF ke target ukuran yang kamu mau",
@@ -541,10 +541,12 @@ class MainWindow(QMainWindow):
             fmt="GABUNG", noun="file PDF"),
         "pisah": dict(
             title="Pisah PDF",
-            desc="Pisahkan satu halaman atau satu set halaman menjadi "
-                 "file PDF mandiri.",
-            kinds={"pdf"}, min_files=1, action="Pisah PDF",
-            fmt="PISAH", noun="file PDF"),
+            desc="Tentukan sendiri halaman yang dipisah: tulis rentang "
+                 "(mis. 1-3, 5, 8-10) menjadi beberapa PDF, atau ekstrak "
+                 "halaman pilihan menjadi satu PDF.",
+            kinds={"pdf"}, min_files=1, max_files=1,
+            action="Atur Halaman & Pisahkan", run="split_pdf",
+            noun="file PDF"),
         "kompres": dict(
             title="Kompres PDF",
             desc="Kecilkan ukuran file sambil mengoptimalkan kualitas — "
@@ -704,6 +706,8 @@ class MainWindow(QMainWindow):
         cfg = self._tool_cfg()
         if cfg.get("run") == "edit_pdf":
             self.on_pdf_edit()
+        elif cfg.get("run") == "split_pdf":
+            self.on_split()
         elif cfg.get("run") == "edit_image":
             self.on_edit()
         elif cfg.get("run") == "remove_bg":
@@ -962,6 +966,19 @@ class MainWindow(QMainWindow):
             self.status.setText(msg)
             self.tool_status.setText(msg)
             self._last_folder = dlg.saved_path.parent
+            self.open_btn.show()
+
+    def on_split(self) -> None:
+        if len(self._files) != 1 or detect_kind(self._files[0]) != "pdf":
+            return
+        dlg = SplitDialog(self._files[0], self)
+        if dlg.exec() and dlg.saved_paths:
+            names = "\n".join(f"• {p.name}" for p in dlg.saved_paths)
+            msg = (f"✅ Beres! {len(dlg.saved_paths)} file hasil pisah:\n"
+                   f"{names}")
+            self.status.setText(msg)
+            self.tool_status.setText(msg)
+            self._last_folder = dlg.saved_paths[0].parent
             self.open_btn.show()
 
     def on_pdf_edit(self) -> None:

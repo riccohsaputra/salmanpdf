@@ -392,3 +392,89 @@ def convert_many(srcs: list[Path], fmt: str, *,
     for s in srcs:
         out.extend(convert(s, fmt, target_bytes=target_bytes))
     return out
+
+
+# ------------------------------------------------------- pisah PDF manual
+def parse_page_spec(spec: str, total: int) -> list[list[int]]:
+    """
+    Urai spesifikasi halaman (1-based, ditulis user) menjadi kelompok
+    halaman 0-based. Contoh: "1-3, 5, 8-10" -> [[0,1,2],[4],[7,8,9]].
+    Token dipisah koma; tiap token satu halaman "5" atau rentang "8-10".
+    """
+    if total < 1:
+        raise ConversionError("PDF tidak punya halaman.")
+    groups: list[list[int]] = []
+    for raw in spec.split(","):
+        tok = raw.strip()
+        if not tok:
+            continue
+        if "-" in tok:
+            a_s, _, b_s = tok.partition("-")
+            try:
+                a, b = int(a_s.strip()), int(b_s.strip())
+            except ValueError:
+                raise ConversionError(f"Rentang tidak valid: '{tok}'.") from None
+            if a > b:
+                raise ConversionError(
+                    f"Rentang terbalik: '{tok}' (awal harus <= akhir).")
+            pages = list(range(a, b + 1))
+        else:
+            try:
+                pages = [int(tok)]
+            except ValueError:
+                raise ConversionError(
+                    f"Nomor halaman tidak valid: '{tok}'.") from None
+        for pg in pages:
+            if pg < 1 or pg > total:
+                raise ConversionError(
+                    f"Halaman {pg} di luar jangkauan (dokumen {total} halaman).")
+        groups.append([pg - 1 for pg in pages])
+    if not groups:
+        raise ConversionError("Isi dulu halaman yang mau dipisah.")
+    return groups
+
+
+def split_pdf_groups(src: Path, groups: list[list[int]]) -> list[Path]:
+    """Satu PDF keluaran per kelompok halaman. Nama: -hal{a} / -hal{a}-{b}
+    (1-based mengikuti halaman pertama-terakhir kelompok)."""
+    try:
+        doc = pymupdf.open(src)
+    except Exception as e:
+        raise ConversionError(f"PDF tidak bisa dibuka: {e}") from e
+    out: list[Path] = []
+    with doc:
+        for group in groups:
+            if not group:
+                continue
+            first, last = group[0] + 1, group[-1] + 1
+            suffix = (f"-hal{first}" if first == last
+                      else f"-hal{first}-{last}")
+            dest = unique_output(src, "pdf", suffix)
+            single = pymupdf.open()
+            for idx in group:
+                single.insert_pdf(doc, from_page=idx, to_page=idx)
+            single.save(dest, garbage=3, deflate=True)
+            single.close()
+            out.append(dest)
+    return out
+
+
+def extract_pages(src: Path, pages: list[int]) -> Path:
+    """Satu PDF berisi halaman pilihan saja (0-based, urutan dipertahankan,
+    duplikat dibuang). Nama: -pilihan."""
+    seen: set[int] = set()
+    ordered = [p for p in pages if not (p in seen or seen.add(p))]
+    if not ordered:
+        raise ConversionError("Belum ada halaman yang dipilih.")
+    try:
+        doc = pymupdf.open(src)
+    except Exception as e:
+        raise ConversionError(f"PDF tidak bisa dibuka: {e}") from e
+    dest = unique_output(src, "pdf", "-pilihan")
+    single = pymupdf.open()
+    with doc:
+        for idx in ordered:
+            single.insert_pdf(doc, from_page=idx, to_page=idx)
+    single.save(dest, garbage=3, deflate=True)
+    single.close()
+    return dest
