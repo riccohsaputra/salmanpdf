@@ -6,8 +6,8 @@ berkas salmanpdf/__init__.py (memuat __version__) dan CHANGELOG.md di
 branch main. Logika di modul ini MURNI (tanpa GUI) dan fungsi ambil-data
 bisa disuntikkan (fetch=...) supaya bisa diuji tanpa jaringan.
 
-Catatan: repo saat ini bernama tangerine-linux di GitHub (rename ke
-salmanpdf masih pending di Settings repo) — URL mengikutinya.
+Catatan: repo di GitHub bernama salmanpdf (di-rename dari
+tangerine-linux pada 2026-10-27; alamat lama dialihkan GitHub).
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import re
 import urllib.request
 from typing import Callable
 
-REPO = "riccohsaputra/tangerine-linux"
+REPO = "riccohsaputra/salmanpdf"
 RAW = f"https://raw.githubusercontent.com/{REPO}/main"
 INIT_URL = f"{RAW}/salmanpdf/__init__.py"
 CHANGELOG_URL = f"{RAW}/CHANGELOG.md"

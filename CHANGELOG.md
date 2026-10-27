@@ -3,6 +3,13 @@
 Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
 Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
 
+## v0.11.4 — 2026-10-27
+- Repo GitHub resmi berganti nama: riccohsaputra/tangerine-linux →
+  riccohsaputra/salmanpdf. Updater sekarang menunjuk nama baru
+  (alamat lama tetap dialihkan GitHub, jadi instalasi lama aman).
+- Build GitHub Actions pertama yang sukses penuh: run #2 menghasilkan
+  SalmanPDF untuk Windows, macOS, dan Linux sekaligus.
+
 ## v0.11.3 — 2026-10-27
 - Perbaikan build GitHub Actions: langkah Icons gagal di run pertama
   karena icon-source-ref.png (berkas biner) memang tidak ada di repo.
