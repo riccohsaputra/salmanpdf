@@ -122,15 +122,22 @@ class ToolDropArea(QFrame):
 
 
 class UpdateWorker(QThread):
-    """Cek update di latar belakang (jaringan tak boleh memblokir UI)."""
+    """Cek update di latar belakang (jaringan tak boleh memblokir UI).
+    Dari checkout git: cek lewat git lokal (jalan walau repo privat).
+    Instalasi paket: cek lewat HTTP ke GitHub."""
     done = Signal(object)
 
-    def __init__(self, current: str):
+    def __init__(self, current: str, root=None):
         super().__init__()
         self._current = current
+        self._root = root
 
     def run(self):  # noqa: N802 (Qt API)
-        self.done.emit(updater.check_update_detailed(self._current))
+        if self._root is not None:
+            self.done.emit(
+                updater.check_update_git(self._current, self._root))
+        else:
+            self.done.emit(updater.check_update_detailed(self._current))
 
 
 class PullWorker(QThread):
@@ -146,9 +153,25 @@ class PullWorker(QThread):
             proc = subprocess.run(
                 ["git", "pull", "--ff-only"], cwd=str(self._root),
                 capture_output=True, text=True, timeout=180)
-            tail = (proc.stdout or proc.stderr or "").strip().splitlines()
-            self.done.emit(proc.returncode == 0,
-                           tail[-1] if tail else "git pull selesai.")
+            if proc.returncode != 0:
+                tail = (proc.stderr or proc.stdout or "").strip().splitlines()
+                self.done.emit(False, tail[-1] if tail else "git pull gagal.")
+                return
+            note = ""
+            req = self._root / "requirements.txt"
+            if req.exists():
+                try:
+                    import sys as _sys
+
+                    subprocess.run(
+                        [_sys.executable, "-m", "pip", "install", "-q",
+                         "-r", str(req)],
+                        capture_output=True, text=True, timeout=600)
+                    note = " Dependensi ikut disinkronkan."
+                except Exception:
+                    note = " (Sinkron dependensi dilewati — jalankan run.sh bila ada fitur baru yang butuh library tambahan.)"
+            tail = (proc.stdout or "").strip().splitlines()
+            self.done.emit(True, (tail[-1] if tail else "git pull selesai.") + note)
         except Exception as e:
             self.done.emit(False, str(e))
 
@@ -1066,7 +1089,9 @@ class MainWindow(QMainWindow):
         from . import __version__
 
         self._upd_manual = manual
-        self._upd_worker = UpdateWorker(__version__)
+        _root = Path(__file__).resolve().parent.parent
+        self._upd_worker = UpdateWorker(
+            __version__, _root if (_root / ".git").exists() else None)
         self._upd_worker.done.connect(self._on_update_checked)
         self._upd_worker.start()
 

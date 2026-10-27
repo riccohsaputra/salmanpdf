@@ -3,6 +3,12 @@
 Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
 Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
 
+## v0.11.2 — 2026-10-27
+- Tombol Update di instalasi checkout (Linux) sekarang memeriksa &
+  memasang update lewat git lokal — bekerja walau repo privat, tanpa
+  perlu terminal sama sekali. Dependensi ikut disinkronkan otomatis
+  setelah update, sama seperti alur update.sh + run.sh.
+
 ## v0.11.1 — 2026-10-27
 - Klik tombol Update saat aplikasi sudah versi terbaru kini memunculkan
   pemberitahuan dialog "SalmanPDF sudah dalam versi terbaru" (berlaku

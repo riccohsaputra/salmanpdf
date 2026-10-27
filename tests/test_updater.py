@@ -63,3 +63,25 @@ def test_check_update_detailed_states():
     def boom(url: str) -> str:
         raise OSError("offline")
     assert U.check_update_detailed("0.9.0", fetch=boom)["state"] == "error"
+
+
+def test_check_update_git():
+    outputs = {
+        ("show", "origin/main:salmanpdf/__init__.py"): '__version__ = "0.11.0"\n',
+        ("show", "origin/main:CHANGELOG.md"): CHANGELOG,
+    }
+
+    def runner(args, cwd):
+        if args[0] == "fetch":
+            return ""
+        return outputs[tuple(args)]
+
+    res = U.check_update_git("0.10.0", "/repo", runner=runner)
+    assert res["state"] == "update" and res["latest"] == "0.11.0"
+    assert "Fitur update otomatis" in res["notes"]
+    assert "Pisah PDF manual" not in res["notes"]  # 0.10.0 = versi terpasang
+    assert U.check_update_git("0.11.0", "/repo", runner=runner)["state"] == "current"
+
+    def boom(args, cwd):
+        raise OSError("no repo")
+    assert U.check_update_git("0.10.0", "/repo", runner=boom)["state"] == "error"

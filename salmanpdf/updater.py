@@ -100,3 +100,45 @@ def check_update(current: str,
     """
     res = check_update_detailed(current, fetch)
     return res if res["state"] == "update" else None
+
+
+# ------------------------------------------------------- cek via git lokal
+def _git_runner(args: list[str], cwd) -> str:
+    import subprocess
+
+    proc = subprocess.run(["git", *args], cwd=str(cwd),
+                          capture_output=True, text=True, timeout=90)
+    if proc.returncode != 0:
+        raise OSError((proc.stderr or "git gagal").strip())
+    return proc.stdout
+
+
+def check_update_git(current: str, root,
+                     runner: Callable[..., str] = _git_runner) -> dict:
+    """
+    Cek update memakai git lokal (fetch + baca berkas dari origin/main).
+    Jalan walau repo privat karena memakai kredensial git pengguna
+    sendiri — jalur utama untuk instalasi checkout (Linux dev).
+    Hasil sama bentuknya dengan check_update_detailed.
+    """
+    try:
+        try:
+            runner(["fetch", "--quiet", "origin"], root)
+        except Exception:
+            pass  # fetch gagal (offline): nilai dari refs yang ada
+        latest = parse_latest_version(
+            runner(["show", "origin/main:salmanpdf/__init__.py"], root))
+    except Exception:
+        return {"state": "error"}
+    if latest is None:
+        return {"state": "error"}
+    if not is_newer(latest, current):
+        return {"state": "current", "latest": latest}
+    notes = ""
+    try:
+        notes = changelog_between(
+            runner(["show", "origin/main:CHANGELOG.md"], root),
+            current, latest)
+    except Exception:
+        notes = ""
+    return {"state": "update", "latest": latest, "notes": notes}
