@@ -326,6 +326,24 @@ def office_convert(src: Path, fmt: str) -> list[Path]:
     """
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if soffice is None:
+        # Cadangan: lokasi instalasi baku LibreOffice per OS (sering tidak
+        # masuk PATH di Windows/macOS)
+        import sys as _sys
+
+        if _sys.platform.startswith("win"):
+            _cands = [
+                r"C:\Program Files\LibreOffice\program\soffice.exe",
+                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+            ]
+        elif _sys.platform == "darwin":
+            _cands = ["/Applications/LibreOffice.app/Contents/MacOS/soffice"]
+        else:
+            _cands = ["/usr/bin/soffice", "/snap/bin/libreoffice"]
+        for _c in _cands:
+            if Path(_c).exists():
+                soffice = _c
+                break
+    if soffice is None:
         raise ConversionError(
             "LibreOffice belum terinstall. Install dulu: sudo apt install libreoffice")
     target = fmt.lower()

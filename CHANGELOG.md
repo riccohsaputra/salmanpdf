@@ -1,0 +1,50 @@
+# Changelog SalmanPDF
+
+Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
+Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
+
+## v0.11.0 — 2026-10-27
+- Tombol 🔄 Update di header + cek update otomatis saat aplikasi dibuka:
+  ada versi baru -> muncul pemberitahuan beserta detail perubahannya,
+  tombol "Update Sekarang" memasang update (git pull di instalasi
+  checkout) atau membuka halaman unduhan.
+- Siap lintas platform dari kode sumber yang sama: perbaikan jalur
+  LibreOffice di Windows/macOS, buka-folder mengikuti OS, dan pesan
+  Mode Global yang sadar OS.
+- Script build Windows (build-windows.bat) dan macOS (build-mac.sh)
+  berbasis PyInstaller + panduan PACKAGING.md.
+
+## v0.10.0 — 2026-10-27
+- Pisah PDF sekarang manual: tulis rentang halaman sendiri (mis.
+  1-3, 5, 8-10) menjadi beberapa PDF, atau ekstrak halaman pilihan
+  menjadi satu PDF — dengan validasi langsung dan strip nomor halaman.
+
+## v0.9.0 — 2026-10-27
+- Edit PDF: preview bisa zoom (roda mouse / tombol + dan -),
+  tempelan teks & gambar bisa dipilih dan diseret pindah posisi,
+  dan susunannya bisa diatur (paling depan, paling belakang, maju,
+  mundur) + hapus tempelan terpilih.
+
+## v0.8.5 — 2026-10-25
+- Tulisan "created by Ricco Abu Salman" dibuat lebih menonjol.
+
+## v0.8.4 — 2026-10-25
+- Audit menu menyeluruh: filter dialog file kini mencakup .gif dan
+  .tif (sebelumnya hanya bisa lewat seret & letakkan).
+
+## v0.8.2 — 2026-10-25
+- Mode gelap: ikon logo berubah putih agar terlihat, label teks tidak
+  lagi berbackground kotak hitam.
+
+## v0.8.1 — 2026-10-25
+- Switch mode terang/gelap di header, pilihan tersimpan otomatis.
+
+## v0.8.0 — 2026-10-25
+- Menu baru: Hapus Background gambar (hasil PNG transparan).
+
+## v0.7.9 — 2026-10-25
+- Logo header memakai ikon dokumen pilihan (menggantikan huruf S).
+
+## v0.7.4 — 2026-10-25
+- Ikon kartu ala iLovePDF: ubin warna solid dengan glyph putih,
+  warna khas per alat. Tampilan dikunci sebagai acuan.

@@ -20,10 +20,12 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
+from PySide6.QtGui import (QDesktopServices, QIcon, QImage,
+                           QPainter, QPixmap)
 from PySide6.QtWidgets import (
     QApplication, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout,
     QInputDialog, QLabel, QMainWindow, QProgressBar, QPushButton,
+    QTextEdit,
     QScrollArea, QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
@@ -35,6 +37,7 @@ FILE_FILTER = (
     "Semua file (*)")
 
 from .converters import ConversionError, convert_many, detect_kind, formats_for
+from . import updater
 from .editor import BgRemoveDialog, ImageEditorDialog
 from .icons import tool_icon
 from .overlay import WheelOverlay
@@ -115,6 +118,38 @@ class ToolDropArea(QFrame):
                  if u.isLocalFile()]
         if files:
             self.filesDropped.emit(files)
+
+
+class UpdateWorker(QThread):
+    """Cek update di latar belakang (jaringan tak boleh memblokir UI)."""
+    done = Signal(object)
+
+    def __init__(self, current: str):
+        super().__init__()
+        self._current = current
+
+    def run(self):  # noqa: N802 (Qt API)
+        self.done.emit(updater.check_update(self._current))
+
+
+class PullWorker(QThread):
+    """git pull --ff-only di checkout lokal (jalur update Linux/dev)."""
+    done = Signal(bool, str)
+
+    def __init__(self, root: Path):
+        super().__init__()
+        self._root = root
+
+    def run(self):  # noqa: N802 (Qt API)
+        try:
+            proc = subprocess.run(
+                ["git", "pull", "--ff-only"], cwd=str(self._root),
+                capture_output=True, text=True, timeout=180)
+            tail = (proc.stdout or proc.stderr or "").strip().splitlines()
+            self.done.emit(proc.returncode == 0,
+                           tail[-1] if tail else "git pull selesai.")
+        except Exception as e:
+            self.done.emit(False, str(e))
 
 
 # ---------------------------------------------------------------- tema
@@ -340,6 +375,11 @@ class MainWindow(QMainWindow):
         brand.addWidget(brand_tag)
         h_lay.addLayout(brand)
         h_lay.addStretch(1)
+        self.btn_update = QPushButton("🔄 Update")
+        self.btn_update.setToolTip("Periksa & pasang update SalmanPDF")
+        self.btn_update.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_update.clicked.connect(lambda: self._check_update(True))
+        h_lay.addWidget(self.btn_update)
         self.theme_btn = QPushButton("🌙")
         self.theme_btn.setFixedSize(38, 38)
         self.theme_btn.setToolTip("Ganti mode gelap / terang")
@@ -530,6 +570,8 @@ class MainWindow(QMainWindow):
         central.setLayout(layout)
         self.setCentralWidget(central)
         self._apply_theme()
+        # Cek update senyap tak lama setelah start (maks. ~sekali sehari)
+        QTimer.singleShot(2500, self._maybe_auto_check)
 
     # ------------------------------------------------- halaman alat (tool page)
     TOOLS = {
@@ -771,6 +813,11 @@ class MainWindow(QMainWindow):
                 38, 38, Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation))
             self.setWindowIcon(QIcon(use))
+        self.btn_update.setStyleSheet(
+            f"QPushButton{{background:{c['card_bg']};color:{c['text']};"
+            f"border:1px solid {c['card_border']};border-radius:10px;"
+            "font-size:12.5px;padding:8px 12px}"
+            "QPushButton:hover{border-color:#d92323;color:#d92323}")
         self.theme_btn.setText("☀️" if self._dark else "🌙")
         self.theme_btn.setStyleSheet(
             f"QPushButton{{background:{c['card_bg']};"
@@ -994,8 +1041,104 @@ class MainWindow(QMainWindow):
             self.open_btn.show()
 
     def open_folder(self) -> None:
-        if self._last_folder:
-            subprocess.Popen(["xdg-open", str(self._last_folder)])
+        if not self._last_folder:
+            return
+        import sys as _sys
+
+        try:
+            if _sys.platform.startswith("win"):
+                import os as _os
+
+                _os.startfile(str(self._last_folder))  # noqa: S606 (Windows)
+            elif _sys.platform == "darwin":
+                subprocess.Popen(["open", str(self._last_folder)])
+            else:
+                subprocess.Popen(["xdg-open", str(self._last_folder)])
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------ update
+    def _check_update(self, manual: bool) -> None:
+        if getattr(self, "_upd_worker", None) is not None \
+                and self._upd_worker.isRunning():
+            return
+        from . import __version__
+
+        self._upd_manual = manual
+        self._upd_worker = UpdateWorker(__version__)
+        self._upd_worker.done.connect(self._on_update_checked)
+        self._upd_worker.start()
+
+    def _on_update_checked(self, info) -> None:
+        import time as _time
+
+        self._settings.setValue("last_update_check", int(_time.time()))
+        from . import __version__
+
+        if info:
+            self._show_update_dialog(info)
+        elif getattr(self, "_upd_manual", False):
+            self.status.setText(
+                f"✅ Tidak ada update lebih baru — kamu di v{__version__} "
+                "(atau server update sedang tidak terjangkau).")
+
+    def _show_update_dialog(self, info: dict) -> None:
+        from . import __version__
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("🚀 Update SalmanPDF Tersedia")
+        dlg.resize(520, 420)
+        lay = QVBoxLayout(dlg)
+        head = QLabel(f"<b>Versi baru v{info['latest']}</b> tersedia "
+                      f"(kamu memakai v{__version__}).")
+        head.setWordWrap(True)
+        lay.addWidget(head)
+        lay.addWidget(QLabel("Apa yang baru:"))
+        notes = QTextEdit()
+        notes.setReadOnly(True)
+        notes.setPlainText(info.get("notes") or
+                           "Detail perubahan belum tersedia untuk versi ini.")
+        lay.addWidget(notes, 1)
+        row = QHBoxLayout()
+        btn_now = QPushButton("⬇️ Update Sekarang")
+        btn_now.clicked.connect(lambda: (dlg.accept(), self._do_update()))
+        row.addWidget(btn_now)
+        btn_later = QPushButton("Nanti Saja")
+        btn_later.clicked.connect(dlg.reject)
+        row.addWidget(btn_later)
+        row.addStretch(1)
+        lay.addLayout(row)
+        dlg.exec()
+
+    def _do_update(self) -> None:
+        root = Path(__file__).resolve().parent.parent
+        if (root / ".git").exists():
+            self.status.setText("⏳ Mengunduh update (git pull)…")
+            self._pull_worker = PullWorker(root)
+            self._pull_worker.done.connect(self._on_pulled)
+            self._pull_worker.start()
+        else:
+            from PySide6.QtCore import QUrl
+
+            QDesktopServices.openUrl(QUrl(updater.RELEASES_URL))
+            self.status.setText(
+                "🌐 Halaman unduhan dibuka di browser — ambil versi terbaru "
+                "di sana, lalu pasang seperti biasa.")
+
+    def _on_pulled(self, ok: bool, message: str) -> None:
+        if ok:
+            self.status.setText(
+                f"✅ Update terpasang: {message} — mulai ulang SalmanPDF "
+                "untuk memakai versi baru.")
+        else:
+            self.status.setText(f"⚠️ Update gagal: {message}")
+
+    def _maybe_auto_check(self) -> None:
+        import time as _time
+
+        last = self._settings.value("last_update_check", 0, type=int)
+        if _time.time() - last > 20 * 3600:
+            self._check_update(False)
 
     # ------------------------------------------------- mode global (v2)
     def toggle_global(self) -> None:
@@ -1009,11 +1152,19 @@ class MainWindow(QMainWindow):
             self.status.setText("Mode global mati.")
             return
         if not session_is_x11():
-            self.status.setText(
-                "⚠️ Mode global butuh sesi X11 — sesi kamu terdeteksi bukan X11 "
-                "(Wayland mengunci intip drag global). Di Mint: logout, di layar "
-                "login pilih sesi Cinnamon on X11, lalu coba lagi. Mode drop-zone "
-                "di atas tetap jalan di sesi apa pun.")
+            import sys as _sys
+
+            if _sys.platform == "linux":
+                self.status.setText(
+                    "⚠️ Mode global butuh sesi X11 — sesi kamu terdeteksi "
+                    "bukan X11 (Wayland mengunci intip drag global). Di Mint: "
+                    "logout, di layar login pilih sesi Cinnamon on X11, lalu "
+                    "coba lagi. Semua alat lain tetap jalan di sesi apa pun.")
+            else:
+                self.status.setText(
+                    "⚠️ Mode Global (Shift+seret) adalah fitur khusus Linux "
+                    "X11 dan tidak tersedia di sistem operasi ini. Semua "
+                    "alat lain di SalmanPDF berfungsi normal.")
             return
         try:
             self._poller = X11Poller()

@@ -25,6 +25,10 @@ def main() -> None:
         master.resize((size, size), Image.Resampling.LANCZOS).save(
             OUT / f"appicon-{size}.png")
     (OUT / "appicon.png").write_bytes((OUT / "appicon-512.png").read_bytes())
+    # .ico multi-ukuran untuk build Windows (PyInstaller --icon)
+    master.save(OUT / "appicon.ico", format="ICO",
+                sizes=[(16, 16), (32, 32), (48, 48), (64, 64),
+                       (128, 128), (256, 256)])
     print("icons written to", OUT)
 
 
