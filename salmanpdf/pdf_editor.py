@@ -12,16 +12,19 @@ import tempfile
 from pathlib import Path
 
 from PIL import Image
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtCore import QEvent, QTimer, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox, QColorDialog, QComboBox, QDialog, QFileDialog, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QRadioButton, QSlider, QSpinBox,
-    QVBoxLayout,
+    QLabel, QLineEdit, QPushButton, QRadioButton, QScrollArea, QSlider,
+    QSpinBox, QVBoxLayout,
 )
 
 from .imgprep import crop_percent, prepare_image, remove_white_background
-from .pdfedit import apply_edits, list_system_fonts, render_preview
+from .pdfedit import (
+    BASE14, apply_edits, font_file_for, hit_test, list_system_fonts,
+    move_op, op_bbox, render_preview,
+)
 
 PREVIEW_W = 440
 
@@ -142,13 +145,35 @@ class ImagePrepDialog(QDialog):
 
 
 class ClickableLabel(QLabel):
-    clicked = Signal(int, int)
+    """Label preview yang melaporkan tekan/geser/lepas klik + roda mouse
+    (untuk zoom, memilih & menyeret tempelan)."""
+
+    pressed = Signal(int, int)
+    moved = Signal(int, int)
+    released = Signal(int, int)
+    wheeled = Signal(int)
 
     def mousePressEvent(self, event):  # noqa: N802 (Qt API)
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.position()
-            self.clicked.emit(int(pos.x()), int(pos.y()))
+            self.pressed.emit(int(pos.x()), int(pos.y()))
         super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):  # noqa: N802 (Qt API)
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            pos = event.position()
+            self.moved.emit(int(pos.x()), int(pos.y()))
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):  # noqa: N802 (Qt API)
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position()
+            self.released.emit(int(pos.x()), int(pos.y()))
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event):  # noqa: N802 (Qt API)
+        self.wheeled.emit(event.angleDelta().y())
+        event.accept()
 
 
 class PdfEditorDialog(QDialog):
@@ -157,19 +182,36 @@ class PdfEditorDialog(QDialog):
         self.src = Path(src)
         self.ops: list[dict] = []
         self.page = 0
-        self.zoom = 1.0
+        self._scale = 1.0            # titik PDF per piksel preview
+        self.zoom_factor = 1.0       # perbesaran preview (0.5x–3x)
+        self._sel: int | None = None  # indeks tempelan terpilih
+        self._drag_idx: int | None = None
+        self._drag_off = (0.0, 0.0)
+        self._press_pt = (0.0, 0.0)
+        self._dragging = False
+        self._drag_timer = QTimer(self)
+        self._drag_timer.setSingleShot(True)
+        self._drag_timer.timeout.connect(self._refresh_preview)
         self.color = QColor(220, 40, 40)  # merah default (buat tanda tangan/catatan)
         self.image_path: Path | None = None
         self.saved_path: Path | None = None
 
         self.setWindowTitle(f"Edit PDF — {self.src.name}")
-        self.setMinimumWidth(860)
+        self.setMinimumSize(960, 660)
 
         # ---------------- kiri: preview
         self.preview = ClickableLabel("Memuat preview…")
         self.preview.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.preview.setStyleSheet("background: white; border: 1px solid #ddd;")
-        self.preview.clicked.connect(self._on_preview_click)
+        self.preview.pressed.connect(self._on_press)
+        self.preview.moved.connect(self._on_move)
+        self.preview.released.connect(self._on_release)
+        self.preview.wheeled.connect(
+            lambda d: self._zoom_by(0.15 if d > 0 else -0.15))
+        self.scroll = QScrollArea()
+        self.scroll.setWidget(self.preview)
+        self.scroll.setWidgetResizable(False)
+        self.scroll.viewport().installEventFilter(self)
 
         page_row = QHBoxLayout()
         page_row.addWidget(QLabel("Halaman:"))
@@ -180,9 +222,29 @@ class PdfEditorDialog(QDialog):
         page_row.addWidget(self.lbl_pages)
         page_row.addStretch(1)
 
+        zoom_row = QHBoxLayout()
+        zoom_row.addWidget(QLabel("Zoom:"))
+        self.btn_zout = QPushButton("−")
+        self.btn_zout.setFixedWidth(34)
+        self.btn_zout.clicked.connect(lambda: self._zoom_by(-0.25))
+        zoom_row.addWidget(self.btn_zout)
+        self.lbl_zoom = QLabel("100%")
+        self.lbl_zoom.setFixedWidth(44)
+        self.lbl_zoom.setAlignment(Qt.AlignCenter)
+        zoom_row.addWidget(self.lbl_zoom)
+        self.btn_zin = QPushButton("+")
+        self.btn_zin.setFixedWidth(34)
+        self.btn_zin.clicked.connect(lambda: self._zoom_by(0.25))
+        zoom_row.addWidget(self.btn_zin)
+        self.btn_zfit = QPushButton("Pas")
+        self.btn_zfit.clicked.connect(self._zoom_reset)
+        zoom_row.addWidget(self.btn_zfit)
+        zoom_row.addStretch(1)
+
         left = QVBoxLayout()
         left.addLayout(page_row)
-        left.addWidget(self.preview)
+        left.addLayout(zoom_row)
+        left.addWidget(self.scroll, 1)
 
         # ---------------- kanan: kontrol
         right = QVBoxLayout()
@@ -238,7 +300,10 @@ class PdfEditorDialog(QDialog):
         right.addLayout(w_row)
 
         right.addSpacing(8)
-        self.lbl_hint = QLabel("Klik pada preview halaman untuk menempel.")
+        self.lbl_hint = QLabel(
+            "Klik area kosong di preview untuk menempel. Klik tempelan "
+            "untuk memilih, seret untuk memindah. Zoom: roda mouse atau "
+            "tombol + / −.")
         self.lbl_hint.setWordWrap(True)
         right.addWidget(self.lbl_hint)
         self.lbl_ops = QLabel("Edit tertempel: 0")
@@ -246,6 +311,34 @@ class PdfEditorDialog(QDialog):
         self.btn_undo = QPushButton("↩️ Urungkan tempelan terakhir")
         self.btn_undo.clicked.connect(self._undo)
         right.addWidget(self.btn_undo)
+        right.addSpacing(8)
+        right.addWidget(QLabel("<b>Susunan tempelan terpilih</b>"))
+        layer_hint = QLabel("Klik tempelan di preview untuk memilih, "
+                            "seret untuk memindah posisinya.")
+        layer_hint.setWordWrap(True)
+        layer_hint.setStyleSheet("font-size:11px;color:#6b7280")
+        right.addWidget(layer_hint)
+        lay_row1 = QHBoxLayout()
+        self.btn_front = QPushButton("⏫ Paling depan")
+        self.btn_front.clicked.connect(lambda: self._layer("front"))
+        self.btn_back = QPushButton("⏬ Paling belakang")
+        self.btn_back.clicked.connect(lambda: self._layer("back"))
+        lay_row1.addWidget(self.btn_front)
+        lay_row1.addWidget(self.btn_back)
+        right.addLayout(lay_row1)
+        lay_row2 = QHBoxLayout()
+        self.btn_fwd = QPushButton("⬆ Maju")
+        self.btn_fwd.clicked.connect(lambda: self._layer("forward"))
+        self.btn_bwd = QPushButton("⬇ Mundur")
+        self.btn_bwd.clicked.connect(lambda: self._layer("backward"))
+        lay_row2.addWidget(self.btn_fwd)
+        lay_row2.addWidget(self.btn_bwd)
+        right.addLayout(lay_row2)
+        self.btn_delsel = QPushButton("🗑 Hapus tempelan terpilih")
+        self.btn_delsel.clicked.connect(self._delete_selected)
+        right.addWidget(self.btn_delsel)
+        self._layer_btns = [self.btn_front, self.btn_back, self.btn_fwd,
+                            self.btn_bwd, self.btn_delsel]
         right.addStretch(1)
 
         btn_row = QHBoxLayout()
@@ -292,30 +385,112 @@ class PdfEditorDialog(QDialog):
 
     def _page_changed(self, value: int):
         self.page = value - 1
+        self._sel = None
         self._refresh_preview()
 
     def _refresh_preview(self):
-        png, self.zoom, count = render_preview(
-            self.src, self.ops, self.page, PREVIEW_W)
+        width = max(220, int(PREVIEW_W * self.zoom_factor))
+        png, self._scale, count = render_preview(
+            self.src, self.ops, self.page, width)
         self.spin_page.setMaximum(count)
         self.lbl_pages.setText(f"dari {count}")
         pix = QPixmap()
         pix.loadFromData(png)
+        if self._selected_op() is not None:
+            pix = self._draw_selection(pix)
         self.preview.setPixmap(pix)
         self.preview.setFixedSize(pix.size())
         self.lbl_ops.setText(f"Edit tertempel: {len(self.ops)}")
+        self.lbl_zoom.setText(f"{round(self.zoom_factor * 100)}%")
+        for b in self._layer_btns:
+            b.setEnabled(self._selected_op() is not None)
 
-    def _on_preview_click(self, px: int, py: int):
-        x, y = px / self.zoom, py / self.zoom
+    def _selected_op(self) -> dict | None:
+        if self._sel is None or not (0 <= self._sel < len(self.ops)):
+            return None
+        op = self.ops[self._sel]
+        return op if op["page"] == self.page else None
+
+    def _draw_selection(self, pix: QPixmap) -> QPixmap:
+        op = self._selected_op()
+        out = QPixmap(pix)
+        painter = QPainter(out)
+        try:
+            pen = QPen(QColor(217, 35, 35), 2, Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            x0, y0, x1, y1 = op_bbox(op)
+            sc = self._scale
+            painter.drawRect(int(x0 * sc) - 3, int(y0 * sc) - 3,
+                             int((x1 - x0) * sc) + 6, int((y1 - y0) * sc) + 6)
+        finally:
+            painter.end()
+        return out
+
+    # ------------------------------------------------------------ zoom
+    def _zoom_by(self, delta: float):
+        self.zoom_factor = min(3.0, max(0.5, round(
+            (self.zoom_factor + delta) * 100) / 100))
+        self._refresh_preview()
+
+    def _zoom_reset(self):
+        self.zoom_factor = 1.0
+        self._refresh_preview()
+
+    def eventFilter(self, obj, event):  # noqa: N802 (Qt API)
+        if (obj is self.scroll.viewport()
+                and event.type() == QEvent.Type.Wheel):
+            self._zoom_by(0.15 if event.angleDelta().y() > 0 else -0.15)
+            return True
+        return super().eventFilter(obj, event)
+
+    # ------------------------------------------------- pilih, seret, tempel
+    def _on_press(self, px: int, py: int):
+        x, y = px / self._scale, py / self._scale
+        idx = hit_test(self.ops, self.page, x, y)
+        if idx is not None:
+            self._sel = idx
+            op = self.ops[idx]
+            self._drag_idx = idx
+            self._drag_off = (x - op["x"], y - op["y"])
+            self._press_pt = (x, y)
+            self._dragging = False
+            self._refresh_preview()
+            return
+        self._place(x, y)
+
+    def _on_move(self, px: int, py: int):
+        if self._drag_idx is None:
+            return
+        x, y = px / self._scale, py / self._scale
+        if not self._dragging:
+            if (abs(x - self._press_pt[0]) + abs(y - self._press_pt[1])
+                    < 2.0):
+                return
+            self._dragging = True
+        op = self.ops[self._drag_idx]
+        op["x"] = x - self._drag_off[0]
+        op["y"] = y - self._drag_off[1]
+        if not self._drag_timer.isActive():
+            self._drag_timer.start(40)
+
+    def _on_release(self, px: int, py: int):
+        if self._dragging:
+            self._refresh_preview()
+        self._drag_idx = None
+        self._dragging = False
+
+    def _place(self, x: float, y: float):
         if self.radio_text.isChecked():
             text = self.edit_text.text().strip()
             if not text:
                 self.lbl_hint.setText("Isi teksnya dulu, baru klik preview.")
                 return
+            fam = self.combo_font.currentText()
+            size = self.spin_size.value()
             self.ops.append({
                 "type": "text", "page": self.page, "x": x, "y": y,
-                "text": text, "font": self.combo_font.currentText(),
-                "size": self.spin_size.value(),
+                "text": text, "font": fam, "size": size,
+                "w": _measure_text(text, fam, size),
                 "color": (self.color.redF(), self.color.greenF(),
                           self.color.blueF()),
             })
@@ -330,11 +505,28 @@ class PdfEditorDialog(QDialog):
                 "type": "image", "page": self.page, "x": x, "y": y,
                 "w": w, "h": h, "path": str(self.image_path),
             })
+        self._sel = len(self.ops) - 1
+        self._refresh_preview()
+
+    # ------------------------------------------------------------ susunan
+    def _layer(self, mode: str):
+        if self._sel is None:
+            return
+        self._sel = move_op(self.ops, self._sel, mode)
+        self._refresh_preview()
+
+    def _delete_selected(self):
+        if self._sel is None:
+            return
+        self.ops.pop(self._sel)
+        self._sel = None
         self._refresh_preview()
 
     def _undo(self):
         if self.ops:
             self.ops.pop()
+            if self._sel is not None and self._sel >= len(self.ops):
+                self._sel = None
             self._refresh_preview()
 
     def _save(self):
@@ -343,3 +535,19 @@ class PdfEditorDialog(QDialog):
             return
         self.saved_path = apply_edits(self.src, self.ops)
         self.accept()
+
+
+def _measure_text(text: str, family: str, size: int) -> float:
+    """Lebar teks (titik PDF) memakai metrik font aslinya bila bisa,
+    supaya kotak seleksi & uji klik akurat. Gagal -> perkiraan kasar."""
+    try:
+        import pymupdf
+
+        ff = font_file_for(family)
+        if ff:
+            return pymupdf.Font(fontfile=str(ff)).text_length(
+                text, fontsize=size)
+        return pymupdf.get_text_length(
+            text, fontname=BASE14.get(family, "helv"), fontsize=size)
+    except Exception:
+        return len(text) * size * 0.52

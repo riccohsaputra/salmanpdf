@@ -117,3 +117,62 @@ def render_preview(src: Path, ops: list[dict], page_index: int,
     count = doc.page_count
     doc.close()
     return data, zoom, count
+
+
+# ---------------------------------------------------------- susunan & seleksi
+def op_bbox(op: dict) -> tuple[float, float, float, float]:
+    """Kotak batas op dalam koordinat titik PDF (x0, y0, x1, y1).
+    Teks: titik sisip adalah awal baseline, jadi kotak naik sebesar
+    ukuran font ke atas."""
+    x, y = float(op["x"]), float(op["y"])
+    if op["type"] == "image":
+        return (x, y, x + float(op["w"]), y + float(op["h"]))
+    size = float(op.get("size", 14))
+    w = float(op.get("w", 0)) or len(op.get("text", "")) * size * 0.52
+    return (x, y - size, x + w, y + size * 0.35)
+
+
+def hit_test(ops: list[dict], page: int, x: float, y: float) -> int | None:
+    """Indeks op PALING ATAS di halaman `page` yang kotaknya memuat titik
+    (x, y), atau None. Urutan gambar = urutan daftar: yang terakhir
+    digambar paling atas."""
+    for i in range(len(ops) - 1, -1, -1):
+        op = ops[i]
+        if op["page"] != page:
+            continue
+        x0, y0, x1, y1 = op_bbox(op)
+        if x0 <= x <= x1 and y0 <= y <= y1:
+            return i
+    return None
+
+
+def move_op(ops: list[dict], idx: int, mode: str) -> int:
+    """Geser urutan gambar satu op; hanya relatif terhadap op di halaman
+    yang sama. mode: 'front' (paling depan), 'back' (paling belakang),
+    'forward' (maju selangkah), 'backward' (mundur selangkah).
+    Return: indeks op setelah dipindah."""
+    op = ops[idx]
+    page = op["page"]
+    same = [i for i, o in enumerate(ops) if o["page"] == page]
+    pos = same.index(idx)
+    if mode == "forward" and pos < len(same) - 1:
+        j = same[pos + 1]
+        ops[idx], ops[j] = ops[j], ops[idx]
+        return j
+    if mode == "backward" and pos > 0:
+        j = same[pos - 1]
+        ops[idx], ops[j] = ops[j], ops[idx]
+        return j
+    if mode == "front" and pos < len(same) - 1:
+        ops.pop(idx)
+        rest = [i for i, o in enumerate(ops) if o["page"] == page]
+        at = rest[-1] + 1 if rest else len(ops)
+        ops.insert(at, op)
+        return at
+    if mode == "back" and pos > 0:
+        ops.pop(idx)
+        rest = [i for i, o in enumerate(ops) if o["page"] == page]
+        at = rest[0] if rest else 0
+        ops.insert(at, op)
+        return at
+    return idx
