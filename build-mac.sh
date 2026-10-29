@@ -29,7 +29,7 @@ iconutil -c icns "$ICONSET" -o build/SalmanPDF.icns
 
 echo "[3/4] Membangun SalmanPDF.app..."
 pyinstaller --noconfirm --windowed --name SalmanPDF \
-  --icon build/SalmanPDF.icns --exclude-module Xlib main.py
+  --icon build/SalmanPDF.icns --exclude-module Xlib --exclude-module pymupdf.layout --exclude-module onnxruntime main.py
 
 echo "[4/4] Mengemas zip..."
 ditto -c -k --keepParent dist/SalmanPDF.app SalmanPDF-macOS.zip

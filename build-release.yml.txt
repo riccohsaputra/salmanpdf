@@ -51,7 +51,7 @@ jobs:
         run: python make_icon.py
       - name: Build (Windows)
         if: runner.os == 'Windows'
-        run: pyinstaller --noconfirm --windowed --name SalmanPDF --icon salmanpdf/assets/appicon.ico --exclude-module Xlib main.py
+        run: pyinstaller --noconfirm --windowed --name SalmanPDF --icon salmanpdf/assets/appicon.ico --exclude-module Xlib --exclude-module pymupdf.layout --exclude-module onnxruntime main.py
       - name: Build (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -59,10 +59,10 @@ jobs:
           for s in 16 32 128 256 512; do sips -z $s $s salmanpdf/assets/appicon-1024.png --out build/SalmanPDF.iconset/icon_${s}x${s}.png >/dev/null; done
           for s in 32 64 256 512 1024; do h=$((s/2)); sips -z $s $s salmanpdf/assets/appicon-1024.png --out build/SalmanPDF.iconset/icon_${h}x${h}@2x.png >/dev/null; done
           iconutil -c icns build/SalmanPDF.iconset -o build/SalmanPDF.icns
-          pyinstaller --noconfirm --windowed --name SalmanPDF --icon build/SalmanPDF.icns --exclude-module Xlib main.py
+          pyinstaller --noconfirm --windowed --name SalmanPDF --icon build/SalmanPDF.icns --exclude-module Xlib --exclude-module pymupdf.layout --exclude-module onnxruntime main.py
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        run: pyinstaller --noconfirm --windowed --name SalmanPDF main.py
+        run: pyinstaller --noconfirm --windowed --name SalmanPDF --exclude-module pymupdf.layout --exclude-module onnxruntime main.py
       - name: Package (Windows)
         if: runner.os == 'Windows'
         run: Compress-Archive -Path dist/SalmanPDF -DestinationPath SalmanPDF-Windows.zip -Force

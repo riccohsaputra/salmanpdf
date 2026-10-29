@@ -3,6 +3,19 @@
 Semua perubahan penting per versi. Berkas ini juga dibaca oleh fitur
 Cek Update di dalam aplikasi untuk menampilkan "apa yang baru".
 
+## v0.12.1 — 2026-10-29
+
+- **Perbaikan crash start di build Windows (dan build beku lain).**
+  PyMuPDF versi baru mengaktifkan subpaket analisis layout (model ONNX)
+  setiap kali diimpor; berkas modelnya tidak ikut terbundel PyInstaller
+  sehingga build v0.12.0 mati sebelum jendela tampil dengan
+  FileNotFoundError di pymupdf/layout. SalmanPDF tidak memakai analisis
+  layout: build beku kini memblokir aktivasi itu, dan perintah
+  PyInstaller mengecualikan pymupdf.layout + onnxruntime dari bundel
+  (unduhan ikut jauh lebih ramping). Pengguna build v0.12.0 Windows:
+  unduh ulang rilis ini — aplikasi lama tidak bisa start sama sekali
+  sehingga tombol Update di dalamnya tidak dapat dipakai.
+
 ## v0.12.0 — 2026-10-27
 - Konversi Office sekarang dua backend: di Windows, dokumen
   dikonversi memakai Microsoft Office asli (Word/PowerPoint/Excel

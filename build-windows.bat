@@ -18,7 +18,7 @@ python make_icon.py
 if errorlevel 1 goto :gagal
 
 echo [3/4] Membangun SalmanPDF.exe...
-pyinstaller --noconfirm --windowed --name SalmanPDF --icon salmanpdf\assets\appicon.ico --exclude-module Xlib main.py
+pyinstaller --noconfirm --windowed --name SalmanPDF --icon salmanpdf\assets\appicon.ico --exclude-module Xlib --exclude-module pymupdf.layout --exclude-module onnxruntime main.py
 if errorlevel 1 goto :gagal
 
 echo [4/4] Mengemas zip...
